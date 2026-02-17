@@ -3,7 +3,6 @@ import yfinance as yf
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from datetime import datetime
 
 # --- 1. CONFIG & UI STYLING ---
 st.set_page_config(page_title="Arbitrage Monitor", layout="wide")
@@ -12,7 +11,7 @@ st.markdown("""
     <style>
     .main { background-color: #f0f2f6; }
     
-    /* MAKING LABELS BOLD */
+    /* BOLD LABELS FOR INPUTS AND METRICS */
     label[data-testid="stWidgetLabel"] p {
         font-weight: bold !important;
         font-size: 16px !important;
@@ -34,6 +33,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# KEEPING ORIGINAL HEADING
 st.title("🏛️ Cross-Asset Arbitrage Opportunity Monitor")
 
 # --- 2. ASSET MASTER DATA ---
@@ -45,57 +45,32 @@ with st.sidebar:
     asset = st.selectbox("Select Asset", list(ticker_map.keys()))
     num_lots = st.number_input("Number of Lots", min_value=1, value=1)
     r_rate = st.slider("Risk-Free Rate (%)", 4.0, 10.0, 6.75) / 100
+    days_to_expiry = st.number_input("Days to Expiry", value=15, min_value=1)
     st.divider()
     brokerage = st.number_input("Brokerage/Side (₹)", value=20.0)
     margin_pct = st.slider("Margin Requirement (%)", 10, 40, 20) / 100
-    
-    if st.button("🔄 Refresh Live Prices"):
-        st.cache_data.clear()
 
-# --- 3. DYNAMIC DATA ENGINE ---
-@st.cache_data(ttl=60)
-def fetch_live_market_data(ticker_symbol):
-    # Safe Defaults
-    s, k, c, p, d = 25000.0, 25000.0, 400.0, 350.0, 15
+# --- 3. DATA ENGINE ---
+@st.cache_data(ttl=30)
+def get_spot(ticker):
     try:
-        stock = yf.Ticker(ticker_symbol)
-        history = stock.history(period="1d")
-        if not history.empty:
-            s = history['Close'].iloc[-1]
-            
-        expirations = stock.options
-        if expirations:
-            # Fetching the nearest expiry option chain
-            chain = stock.option_chain(expirations[0])
-            calls, puts = chain.calls, chain.puts
-            
-            # Find the strike closest to current market price (ATM)
-            atm_idx = (calls['strike'] - s).abs().idxmin()
-            k = calls.loc[atm_idx, 'strike']
-            c = calls.loc[atm_idx, 'lastPrice']
-            p = puts.loc[atm_idx, 'lastPrice']
-            
-            # Calculate days to expiry dynamically
-            d1 = datetime.strptime(expirations[0], '%Y-%m-%d')
-            d = max((d1 - datetime.now()).days, 1)
-            
-        return float(s), float(k), float(c), float(p), int(d)
+        data = yf.Ticker(ticker).history(period="1d")
+        return round(data['Close'].iloc[-1], 2) if not data.empty else 25725.40
     except:
-        return s, k, c, p, d
+        return 25725.40
 
-# Fetching Actual Market Values
-s0, live_k, live_c, live_p, dte = fetch_live_market_data(ticker_map[asset])
+s0 = get_spot(ticker_map[asset])
 lot = lot_sizes[asset]
 total_units = num_lots * lot
 
-# Inputs (Pre-filled with Live Market Data)
+# Restored manual inputs to prevent "messed up" prices
 c1, c2, c3 = st.columns(3)
-with c1: strike = st.number_input("Strike Price", value=live_k)
-with c2: c_mkt = st.number_input("Call Price", value=live_c)
-with c3: p_mkt = st.number_input("Put Price", value=live_p)
+with c1: strike = st.number_input("Strike Price", value=float(round(s0/10)*10))
+with c2: c_mkt = st.number_input("Call Price", value=round(s0*0.025, 2))
+with c3: p_mkt = st.number_input("Put Price", value=round(s0*0.018, 2))
 
 # Calculations
-t = dte / 365
+t = days_to_expiry / 365
 pv_k = strike * np.exp(-r_rate * t)
 synthetic_spot = c_mkt - p_mkt + pv_k
 spread_per_unit = s0 - synthetic_spot
@@ -118,11 +93,11 @@ m1, m2, m3, m4 = st.columns(4)
 m1.metric("Market Spot", f"₹{s0:,.2f}")
 m2.metric("Synthetic Price", f"₹{synthetic_spot:,.2f}")
 m3.metric("Arbitrage Gap", f"₹{abs(spread_per_unit):.2f}")
-m4.metric("Days to Expiry", f"{dte} Days")
+m4.metric("Capital Req.", f"₹{capital_req:,.0f}")
 
 st.markdown(f'<div style="background-color:{signal_color}; padding:15px; border-radius:10px; text-align:center; color:white;"><h2 style="margin:0;">{signal_line}</h2></div>', unsafe_allow_html=True)
 
-# --- 5. HIGH-VISIBILITY SECTION ---
+# --- 5. HIGH-VISIBILITY SECTION (NO SCROLL) ---
 st.write("")
 col_proof, col_graph = st.columns([1, 1.2])
 
@@ -131,7 +106,7 @@ with col_proof:
     st.markdown(f'<div class="strategy-text">Strategy: {strategy_desc}</div>', unsafe_allow_html=True)
     st.latex(r"P = Units \times [ (S_{T} - S_{0}) + (K - S_{T})^{+} - (S_{T} - K)^{+} + (C - P) ]")
     st.metric("Final Net Profit", f"₹{net_pnl:,.2f}")
-    st.write(f"Profit locked for {total_units} units (After ₹{total_friction:,.2f} fees).")
+    st.write(f"Profit is locked for {total_units} units (After ₹{total_friction:,.2f} fees).")
 
 with col_graph:
     prices = np.linspace(s0*0.8, s0*1.2, 20)
@@ -139,9 +114,9 @@ with col_graph:
     fig.update_layout(title="Risk-Neutral Payoff", xaxis_title="Expiry Price", yaxis_title="Profit", height=280, margin=dict(t=30, b=0, l=0, r=0))
     st.plotly_chart(fig, use_container_width=True)
 
-# --- 6. SCENARIO ANALYSIS (WITH LOT DETAILS) ---
+# --- 6. SCENARIO ANALYSIS (WITH LOT & UNIT DETAILS) ---
 st.divider()
-st.subheader("📉 Expiry Scenario Analysis (Detailed)")
+st.subheader("📉 Expiry Scenario Analysis")
 scenarios = [s0 * 0.9, s0, s0 * 1.1]
 proof_data = []
 
