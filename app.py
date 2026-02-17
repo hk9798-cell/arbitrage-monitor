@@ -25,17 +25,15 @@ st.markdown("""
     div[data-testid="stMetricValue"] { font-size: 28px; color: #1f77b4; font-weight: bold; }
     .stTable { border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
     
-    /* Style for the Strategy Text */
     .strategy-text {
         font-weight: bold;
         font-size: 18px;
-        margin-bottom: 10px;
+        margin-bottom: 5px;
     }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("🏛️ Cross-Asset Arbitrage Opportunity Monitor")
-st.markdown("---")
 
 # --- 2. ASSET MASTER DATA ---
 ticker_map = {"NIFTY": "^NSEI", "RELIANCE": "RELIANCE.NS", "TCS": "TCS.NS", "SBIN": "SBIN.NS", "INFY": "INFY.NS"}
@@ -77,7 +75,7 @@ spread_per_unit = s0 - synthetic_spot
 total_friction = (brokerage * 3 * num_lots) + (s0 * total_units * 0.001)
 capital_req = (s0 * total_units) * margin_pct
 
-# --- 4. SIGNAL & STRATEGY ---
+# --- 4. SIGNAL & METRICS ---
 if spread_per_unit > 0.1:
     signal_line, signal_color = "CONVERSION ARBITRAGE DETECTED", "#28a745"
     net_pnl = (spread_per_unit * total_units) - total_friction
@@ -89,29 +87,34 @@ elif spread_per_unit < -0.1:
 else:
     signal_line, signal_color, net_pnl, strategy_desc = "MARKET IS EFFICIENT", "#6c757d", 0, "No Action"
 
-# Metrics Row
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Market Spot", f"₹{s0:,.2f}")
 m2.metric("Synthetic Price", f"₹{synthetic_spot:,.2f}")
 m3.metric("Arbitrage Gap", f"₹{abs(spread_per_unit):.2f}")
 m4.metric("Capital Req.", f"₹{capital_req:,.0f}")
 
-st.markdown(f'<div style="background-color:{signal_color}; padding:20px; border-radius:10px; text-align:center; color:white;"><h2 style="margin:0;">{signal_line}</h2></div>', unsafe_allow_html=True)
+st.markdown(f'<div style="background-color:{signal_color}; padding:15px; border-radius:10px; text-align:center; color:white;"><h2 style="margin:0;">{signal_line}</h2></div>', unsafe_allow_html=True)
+
+# --- 5. HIGH-VISIBILITY SECTION (NO SCROLL) ---
 st.write("")
-st.metric("Final Net Profit (Projected)", f"₹{net_pnl:,.2f}")
+col_proof, col_graph = st.columns([1, 1.2])
 
-# --- 5. MATHEMATICAL PROOF SECTION (WITHOUT BOX) ---
-st.subheader("📊 Mathematical Execution Proof")
+with col_proof:
+    st.subheader("📊 Execution Proof")
+    st.markdown(f'<div class="strategy-text">Strategy: {strategy_desc}</div>', unsafe_allow_html=True)
+    st.latex(r"P = Units \times [ (S_{T} - S_{0}) + (K - S_{T})^{+} - (S_{T} - K)^{+} + (C - P) ]")
+    st.metric("Final Net Profit", f"₹{net_pnl:,.2f}")
+    st.write(f"Profit is locked (After ₹{total_friction:,.2f} fees).")
 
-# Displaying Strategy in Bold and Formula
-st.markdown(f'<div class="strategy-text">Strategy: {strategy_desc}</div>', unsafe_allow_html=True)
-st.latex(r"Profit = Units \times [ (S_{T} - S_{0}) + (K - S_{T})^{+} - (S_{T} - K)^{+} + (C - P) ]")
-
-st.write(f"Regardless of the price at expiry, your profit is locked at *₹{net_pnl:,.2f}* (After ₹{total_friction:,.2f} fees).")
+with col_graph:
+    prices = np.linspace(s0*0.8, s0*1.2, 20)
+    fig = go.Figure(go.Scatter(x=prices, y=[net_pnl]*20, mode='lines', line=dict(color=signal_color, width=4)))
+    fig.update_layout(title="Risk-Neutral Payoff", xaxis_title="Expiry Price", yaxis_title="Profit", height=280, margin=dict(t=30, b=0, l=0, r=0))
+    st.plotly_chart(fig, use_container_width=True)
 
 # --- 6. SCENARIO ANALYSIS ---
 st.divider()
-st.subheader("📉 Expiry Scenario Analysis (Risk-Free Confirmation)")
+st.subheader("📉 Expiry Scenario Analysis")
 scenarios = [s0 * 0.9, s0, s0 * 1.1]
 proof_data = []
 
@@ -129,9 +132,3 @@ for st_price in scenarios:
     })
 
 st.table(pd.DataFrame(proof_data))
-
-# Payoff Graph
-prices = np.linspace(s0*0.8, s0*1.2, 20)
-fig = go.Figure(go.Scatter(x=prices, y=[net_pnl]*20, mode='lines', line=dict(color=signal_color, width=4)))
-fig.update_layout(title="Risk-Neutral Payoff (Guaranteed Profit)", xaxis_title="Expiry Price", yaxis_title="Profit", height=300)
-st.plotly_chart(fig, use_container_width=True)
