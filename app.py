@@ -17,7 +17,7 @@ ticker_map = {
     "SBIN": "SBIN.NS", 
     "INFY": "INFY.NS"
 }
-lot_sizes = {"NIFTY": 50, "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
+lot_sizes = {"NIFTY": 65, "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
 
 # --- 2. SIDEBAR (Parameters) ---
 with st.sidebar:
