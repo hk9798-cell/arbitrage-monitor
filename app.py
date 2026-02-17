@@ -8,29 +8,24 @@ from datetime import datetime
 # --- 1. CONFIG & CUSTOM STYLING ---
 st.set_page_config(page_title="Arbitrage Monitor", layout="wide")
 
-# Custom CSS to make the dashboard more attractive (Trading Terminal Dark/Glass Theme)
+# Fixed CSS styling for better visual appeal
 st.markdown("""
     <style>
     .main {
-        background-color: #0e1117;
+        background-color: #f0f2f6;
     }
     div[data-testid="stMetricValue"] {
-        font-size: 28px;
-        color: #00d4ff;
+        font-size: 24px;
+        color: #1f77b4;
     }
     .stTable {
         border-radius: 10px;
         overflow: hidden;
     }
-    .arbitrage-box {
-        padding: 20px;
-        border-radius: 10px;
-        border: 1px solid #333;
-        margin-bottom: 20px;
-    }
     </style>
-    """, unsafe_allow_index=True)
+    """, unsafe_allow_html=True)
 
+# Updated Header
 st.title("🏛️ Cross-Asset Arbitrage Opportunity Monitor")
 st.markdown("---")
 
@@ -75,7 +70,7 @@ spread = s0 - synthetic_spot
 total_costs = (brokerage * 3 * num_lots) + (s0 * total_units * 0.001)
 capital_req = (s0 * total_units) * margin_pct
 
-# --- 4. TOP METRICS ---
+# --- 4. TOP METRICS (Visible Spot Price) ---
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Actual Market Spot", f"₹{s0:,.2f}")
 m2.metric("Synthetic Fair Price", f"₹{synthetic_spot:,.2f}")
@@ -86,7 +81,7 @@ m4.metric("Capital Required", f"₹{capital_req:,.0f}")
 st.markdown("---")
 col_left, col_right = st.columns([1, 1.2])
 
-# Dynamic Signal Logic
+# Signal Logic with Dynamic Banner
 if spread > 0.5:
     signal_text = "CONVERSION ARBITRAGE DETECTED"
     signal_color = "#28a745" # Green
@@ -96,22 +91,23 @@ elif spread < -0.5:
     signal_color = "#dc3545" # Red
     net_pnl = (abs(spread) * total_units) - total_costs
 else:
-    signal_text = "MARKET IS EFFICIENT (NO ARBITRAGE)"
+    signal_text = "MARKET IS EFFICIENT"
     signal_color = "#6c757d" # Gray
     net_pnl = 0
 
 with col_left:
-    # Display the full signal line as requested
+    # High-Visibility Signal Banner
     st.markdown(f"""
-        <div style="background-color:{signal_color}; padding:15px; border-radius:10px; text-align:center;">
-            <h2 style="color:white; margin:0;">{signal_text}</h2>
+        <div style="background-color:{signal_color}; padding:20px; border-radius:10px; text-align:center;">
+            <h2 style="color:white; margin:0; font-family:sans-serif;">{signal_text}</h2>
         </div>
-        """, unsafe_allow_index=True)
+        """, unsafe_allow_html=True)
     
     st.write("")
     st.metric(f"Projected Net Profit ({num_lots} Lots)", f"₹{net_pnl:,.2f}")
     
     # Strategy Actions
+    actions = []
     if "CONVERSION" in signal_text:
         actions = [
             {"Action": "BUY", "Item": f"{asset} Underlying", "Price": s0},
@@ -124,7 +120,6 @@ with col_left:
             {"Action": "SELL", "Item": f"{strike} Put", "Price": p_mkt},
             {"Action": "BUY", "Item": f"{strike} Call", "Price": c_mkt}
         ]
-    else: actions = []
 
     if actions:
         st.table(pd.DataFrame(actions))
@@ -134,9 +129,10 @@ with col_right:
     st.subheader("📊 Mathematical Execution Proof")
     
     # Professional Formula Rendering
+    st.markdown("*Core Proof Formula:*")
     st.latex(r"Profit = Units \times [ (S_{T} - S_{0}) + (K - S_{T})^{+} - (S_{T} - K)^{+} + (C - P) ]")
     
-    # Proof Table
+    # Proof Table (Scenario Analysis)
     scenarios = [s0 * 0.9, s0, s0 * 1.1]
     proof_data = []
     for st_price in scenarios:
@@ -153,12 +149,11 @@ with col_right:
             "Expiry Price": f"₹{st_price:,.0f}",
             "Stock P&L": f"₹{s_pnl*total_units:,.0f}",
             "Options P&L": f"₹{o_pnl*total_units:,.0f}",
-            "NET PROFIT": f"₹{total_pnl:,.2f}"
+            "TOTAL NET": f"₹{total_pnl:,.2f}"
         })
     st.table(pd.DataFrame(proof_data))
+    st.caption("Proof: TOTAL NET remains constant across all expiry price scenarios.")
 
-# Visual Plotly Chart
+# Chart for visual appeal
 prices = np.linspace(s0*0.8, s0*1.2, 20)
-fig = go.Figure(go.Scatter(x=prices, y=[net_pnl]*20, mode='lines', line=dict(color='#00d4ff', width=4)))
-fig.update_layout(title="Risk-Neutral Payoff at Expiry", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white", height=300)
-st.plotly_chart(fig, use_container_width=True)
+fig = go.Figure(go.Scatter(x=prices, y=[net_pnl
