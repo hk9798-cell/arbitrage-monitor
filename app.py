@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 
 # --- 1. CONFIG & STYLING ---
-st.set_page_config(page_title="Arbitrage Execution Monitor", layout="wide")
+st.set_page_config(page_title="Financial Engineering Dashboard", layout="wide")
 st.title("🏛️ Financial Engineering: Execution & Proof Dashboard")
 
 ticker_map = {
@@ -15,7 +15,7 @@ ticker_map = {
 }
 lot_sizes = {"NIFTY": 65, "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
 
-# --- 2. SIDEBAR ---
+# --- 2. SIDEBAR (Parameters) ---
 with st.sidebar:
     st.header("⚙️ Execution Parameters")
     asset = st.selectbox("Select Asset", list(ticker_map.keys()))
@@ -27,7 +27,7 @@ with st.sidebar:
     brokerage = st.number_input("Brokerage/Side (₹)", value=20.0)
     margin_pct = st.slider("Margin Requirement (%)", 10, 40, 20) / 100
 
-# --- 3. CALCULATIONS ---
+# --- 3. DATA ENGINE ---
 @st.cache_data(ttl=30)
 def get_spot(ticker):
     data = yf.Ticker(ticker).history(period="1d")
@@ -37,38 +37,46 @@ s0 = get_spot(ticker_map[asset])
 lot = lot_sizes[asset]
 total_units = num_lots * lot
 
+# Manual inputs for Option prices (aligned in 3 columns)
 c1, c2, c3 = st.columns(3)
 strike = c1.number_input("Strike Price", value=float(round(s0/10)*10))
 c_mkt = c2.number_input("Call Price", value=round(s0*0.025, 2))
 p_mkt = c3.number_input("Put Price", value=round(s0*0.018, 2))
 
-# Parity Math
+# --- 4. CALCULATIONS ---
 t = days_to_expiry / 365
 synthetic_spot = c_mkt - p_mkt + (strike * np.exp(-r_rate * t))
 spread = s0 - synthetic_spot
-total_costs = (brokerage * 3 * num_lots) + (s0 * total_units * 0.001) # Brokerage + STT
+total_costs = (brokerage * 3 * num_lots) + (s0 * total_units * 0.001)
 capital_req = (s0 * total_units) * margin_pct
 
-# --- 4. STRATEGY & SIGNAL ---
+# --- 5. TOP METRICS (Added Back Spot Price) ---
+st.divider()
+m1, m2, m3 = st.columns(3)
+m1.metric("Actual Market Spot", f"₹{s0:,.2f}")
+m2.metric("Synthetic Fair Price", f"₹{synthetic_spot:,.2f}")
+m3.metric("Arbitrage Spread", f"₹{abs(spread):.2f}")
+
+# --- 6. STRATEGY & PROOF ---
 st.divider()
 col_left, col_right = st.columns([1, 1.2])
 
-if spread > 1.0:
+# Identify Signal
+if spread > 0.5:
     signal, color = "CONVERSION", "green"
-    net_pnl_total = (spread * total_units) - total_costs
-elif spread < -1.0:
+    net_pnl = (spread * total_units) - total_costs
+elif spread < -0.5:
     signal, color = "REVERSAL", "red"
-    net_pnl_total = (abs(spread) * total_units) - total_costs
+    net_pnl = (abs(spread) * total_units) - total_costs
 else:
     signal, color = "NEUTRAL", "gray"
-    net_pnl_total = 0
+    net_pnl = 0
 
 with col_left:
     st.subheader(f"🛠️ Execution Plan: :{color}[{signal}]")
     st.metric("Total Capital Required", f"₹{capital_req:,.0f}")
-    st.metric("Net Profit ({num_lots} Lots)", f"₹{net_pnl_total:,.2f}")
+    st.metric(f"Net Profit ({num_lots} Lots)", f"₹{net_pnl:,.2f}")
     
-    # Table for CSV Download
     actions = []
     if signal == "CONVERSION":
         actions = [
@@ -90,12 +98,15 @@ with col_left:
         st.download_button("📥 Download Trade Report", df_exec.to_csv().encode('utf-8'), "trade_report.csv")
 
 with col_right:
-    st.subheader("📊 The Proof: Payoff Scenarios")
+    st.subheader("📊 The Proof: Mathematical Execution")
     
-    # Calculation Logic for Proof Table
-    scenarios = [s0 * 0.9, s0, s0 * 1.1] # -10%, ATM, +10%
+    # --- ADDED MATHEMATICAL FORMULA ---
+    st.markdown("*Core Formula:*")
+    st.latex(r"Profit = [ (S_{T} - S_{0}) + (K - S_{T})^{+} - (S_{T} - K)^{+} + (C - P) ] \times Units")
+    
+    # Scenario Calculation
+    scenarios = [s0 * 0.9, s0, s0 * 1.1] 
     proof_rows = []
-    
     for st_price in scenarios:
         if signal == "CONVERSION":
             stock_gain = (st_price - s0)
@@ -103,23 +114,21 @@ with col_right:
         elif signal == "REVERSAL":
             stock_gain = (s0 - st_price)
             opt_gain = (p_mkt - max(0, strike - st_price)) + (max(0, st_price - strike) - c_mkt)
-        else:
-            stock_gain, opt_gain = 0, 0
+        else: stock_gain, opt_gain = 0, 0
             
         final_pnl = (stock_gain + opt_gain) * total_units - total_costs
         proof_rows.append({
-            "Price at Expiry": f"₹{st_price:,.0f}",
+            "Expiry Price": f"₹{st_price:,.0f}",
             "Stock P&L": f"₹{stock_gain * total_units:,.0f}",
             "Options P&L": f"₹{opt_gain * total_units:,.0f}",
-            "NET PROFIT": f"₹{final_pnl:,.2f}"
+            "TOTAL NET": f"₹{final_pnl:,.2f}"
         })
 
     st.table(pd.DataFrame(proof_rows))
-    st.info("💡 Notice: The NET PROFIT remains constant regardless of the Price at Expiry.")
+    st.caption("Notice: TOTAL NET remains constant regardless of the Price at Expiry.")
 
-# Plotly Visual
-prices = np.linspace(s0*0.85, s0*1.15, 20)
-pnl_curve = [net_pnl_total for _ in prices]
-fig = go.Figure(go.Scatter(x=prices, y=pnl_curve, name="Locked Profit", line=dict(color='gold', width=4)))
+# Chart for visual confirmation
+prices = np.linspace(s0*0.8, s0*1.2, 20)
+fig = go.Figure(go.Scatter(x=prices, y=[net_pnl]*20, name="Locked Profit", line=dict(color='gold', width=4)))
 fig.update_layout(title="Arbitrage Payoff (Risk-Neutral)", height=300, margin=dict(l=0,r=0,b=0,t=40))
 st.plotly_chart(fig, use_container_width=True)
