@@ -10,22 +10,30 @@ st.set_page_config(page_title="Arbitrage Monitor", layout="wide")
 st.markdown("""
     <style>
     .main { background-color: #f0f2f6; }
-    /* BOLD LABELS AND METRICS */
+    
+    /* MAKING LABELS BOLD */
+    label[data-testid="stWidgetLabel"] p {
+        font-weight: bold !important;
+        font-size: 16px !important;
+    }
+    
     div[data-testid="stMetricLabel"] p { 
         font-weight: bold !important; 
         font-size: 16px !important; 
-        color: #31333F !important;
     }
+    
     div[data-testid="stMetricValue"] { font-size: 28px; color: #1f77b4; font-weight: bold; }
     .stTable { border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-    .proof-box { background-color: #ffffff; padding: 15px; border: 1px dashed #1f77b4; border-radius: 10px; font-family: monospace; }
     
-    /* Ensuring Table Headers are Bold */
-    .stTable th { font-weight: bold !important; }
+    /* Style for the Strategy Text */
+    .strategy-text {
+        font-weight: bold;
+        font-size: 18px;
+        margin-bottom: 10px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# KEEPING ORIGINAL HEADING
 st.title("🏛️ Cross-Asset Arbitrage Opportunity Monitor")
 st.markdown("---")
 
@@ -92,20 +100,16 @@ st.markdown(f'<div style="background-color:{signal_color}; padding:20px; border-
 st.write("")
 st.metric("Final Net Profit (Projected)", f"₹{net_pnl:,.2f}")
 
-# --- 5. MATHEMATICAL PROOF SECTION ---
+# --- 5. MATHEMATICAL PROOF SECTION (WITHOUT BOX) ---
 st.subheader("📊 Mathematical Execution Proof")
+
+# Displaying Strategy in Bold and Formula
+st.markdown(f'<div class="strategy-text">Strategy: {strategy_desc}</div>', unsafe_allow_html=True)
 st.latex(r"Profit = Units \times [ (S_{T} - S_{0}) + (K - S_{T})^{+} - (S_{T} - K)^{+} + (C - P) ]")
 
-st.markdown(f"""
-<div class="proof-box">
-<b>Execution Proof:</b><br>
-Strategy: {strategy_desc}<br>
-Regardless of the price at expiry, your profit is locked at:<br>
-<b>Net Profit = ₹{net_pnl:,.2f}</b> (After ₹{total_friction:,.2f} fees)
-</div>
-""", unsafe_allow_html=True)
+st.write(f"Regardless of the price at expiry, your profit is locked at *₹{net_pnl:,.2f}* (After ₹{total_friction:,.2f} fees).")
 
-# --- 6. SCENARIO ANALYSIS (HARD SYNCED) ---
+# --- 6. SCENARIO ANALYSIS ---
 st.divider()
 st.subheader("📉 Expiry Scenario Analysis (Risk-Free Confirmation)")
 scenarios = [s0 * 0.9, s0, s0 * 1.1]
