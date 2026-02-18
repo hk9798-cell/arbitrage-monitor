@@ -333,103 +333,76 @@ with col_proof:
     st.caption(f"Across {total_units:,} units ({num_lots} lot{'s' if num_lots > 1 else ''} × {lot})")
 
 with col_graph:
-    prices = np.linspace(s0 * 0.75, s0 * 1.25, 300)
+    # FIX 6: Compute actual leg payoffs at each expiry price
+    prices = np.linspace(s0 * 0.75, s0 * 1.25, 200)
 
     if signal_type == "conversion":
-        spot_pnl  = (prices - s0) * total_units
-        put_pnl   = (np.maximum(strike - prices, 0) - p_mkt) * total_units
-        call_pnl  = (c_mkt - np.maximum(prices - strike, 0)) * total_units
-        total_pnl = spot_pnl + put_pnl + call_pnl - total_friction
+        # Long spot: (ST - S0) * units
+        spot_pnl   = (prices - s0) * total_units
+        # Long put: max(K - ST, 0) - P_premium) * units
+        put_pnl    = (np.maximum(strike - prices, 0) - p_mkt) * total_units
+        # Short call: (C_premium - max(ST - K, 0)) * units
+        call_pnl   = (c_mkt - np.maximum(prices - strike, 0)) * total_units
+        total_pnl  = spot_pnl + put_pnl + call_pnl - total_friction
+
     elif signal_type == "reversal":
-        spot_pnl  = (s0 - prices) * total_units
-        put_pnl   = (p_mkt - np.maximum(strike - prices, 0)) * total_units
-        call_pnl  = (np.maximum(prices - strike, 0) - c_mkt) * total_units
-        total_pnl = spot_pnl + put_pnl + call_pnl - total_friction
+        # Short spot: (S0 - ST) * units
+        spot_pnl   = (s0 - prices) * total_units
+        # Short put: (P_premium - max(K - ST, 0)) * units
+        put_pnl    = (p_mkt - np.maximum(strike - prices, 0)) * total_units
+        # Long call: (max(ST - K, 0) - C_premium) * units
+        call_pnl   = (np.maximum(prices - strike, 0) - c_mkt) * total_units
+        total_pnl  = spot_pnl + put_pnl + call_pnl - total_friction
+
     else:
         spot_pnl  = np.zeros_like(prices)
         put_pnl   = np.zeros_like(prices)
         call_pnl  = np.zeros_like(prices)
         total_pnl = np.zeros_like(prices)
 
-    # ── DUAL Y-AXIS CHART ──────────────────────────────────────────────
-    # Individual legs (left axis) swing massively and cancel each other.
-    # Net P&L (right axis) is what actually matters — zoom it properly.
-    net_range_pad = max(abs(net_pnl) * 5, 500)   # give net P&L breathing room
-
     fig = go.Figure()
 
-    # Individual legs on left y-axis (yaxis)
     fig.add_trace(go.Scatter(
-        x=prices, y=spot_pnl, mode="lines", name="Spot Leg",
-        line=dict(color="#1f77b4", width=1.5, dash="dot"), opacity=0.55,
-        yaxis="y1"
+        x=prices, y=spot_pnl, mode="lines",
+        name="Spot Leg", line=dict(color="#1f77b4", width=1.5, dash="dot"),
+        opacity=0.7
     ))
     fig.add_trace(go.Scatter(
-        x=prices, y=put_pnl, mode="lines", name="Put Leg",
-        line=dict(color="#ff7f0e", width=1.5, dash="dot"), opacity=0.55,
-        yaxis="y1"
+        x=prices, y=put_pnl, mode="lines",
+        name="Put Leg", line=dict(color="#ff7f0e", width=1.5, dash="dot"),
+        opacity=0.7
     ))
     fig.add_trace(go.Scatter(
-        x=prices, y=call_pnl, mode="lines", name="Call Leg",
-        line=dict(color="#9467bd", width=1.5, dash="dot"), opacity=0.55,
-        yaxis="y1"
+        x=prices, y=call_pnl, mode="lines",
+        name="Call Leg", line=dict(color="#9467bd", width=1.5, dash="dot"),
+        opacity=0.7
     ))
-
-    # Net P&L on right y-axis (yaxis2) — zoomed to be clearly visible
     fig.add_trace(go.Scatter(
-        x=prices, y=total_pnl, mode="lines", name="Net P&L (right axis)",
-        line=dict(color=signal_color, width=3.5),
-        yaxis="y2"
+        x=prices, y=total_pnl, mode="lines",
+        name="Net P&L", line=dict(color=signal_color, width=3),
     ))
 
-    # Zero line for net axis
-    fig.add_shape(type="line", x0=prices[0], x1=prices[-1], y0=0, y1=0,
-                  line=dict(color="gray", width=1, dash="dash"), yref="y2")
-
-    # Current spot marker
+    # Zero line
+    fig.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1)
+    # Mark current spot
     fig.add_vline(x=s0, line_dash="dash", line_color="#333333", line_width=1,
-                  annotation_text=f"Spot ₹{s0:,.0f}", annotation_position="top right")
+                  annotation_text=f"Spot ₹{s0:,.0f}", annotation_position="top")
 
     fig.update_layout(
-        title="Strategy Payoff at Expiry — Individual Legs vs Net P&L",
-        xaxis=dict(title="Spot Price at Expiry (₹)", tickformat=",.0f",
-                   showgrid=True, gridcolor="#e9ecef"),
-        # Left axis: individual legs (large scale)
-        yaxis=dict(
-            title="Individual Leg P&L (₹)",
-            tickformat=",.0f",
-            showgrid=False,
-            titlefont=dict(color="#555555"),
-            tickfont=dict(color="#555555"),
-        ),
-        # Right axis: net P&L (zoomed in so it's clearly visible)
-        yaxis2=dict(
-            title="Net P&L (₹)",
-            tickformat=",.0f",
-            overlaying="y",
-            side="right",
-            range=[-net_range_pad, net_range_pad],
-            titlefont=dict(color=signal_color),
-            tickfont=dict(color=signal_color),
-            showgrid=True,
-            gridcolor="#e9ecef",
-            zeroline=True,
-            zerolinecolor="gray",
-        ),
-        height=360,
-        margin=dict(t=45, b=40, l=10, r=10),
+        title="Strategy Payoff at Expiry (by Spot Price)",
+        xaxis_title="Spot Price at Expiry (₹)",
+        yaxis_title="Net P&L (₹)",
+        height=340,
+        margin=dict(t=40, b=40, l=0, r=0),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         hovermode="x unified",
         plot_bgcolor="#f8f9fa",
         paper_bgcolor="white",
     )
+    fig.update_xaxes(tickformat="₹,.0f", showgrid=True, gridcolor="#e9ecef")
+    fig.update_yaxes(tickformat="₹,.0f", showgrid=True, gridcolor="#e9ecef")
 
     st.plotly_chart(fig, use_container_width=True)
-    st.caption(
-        "📌 *Dotted lines* = individual legs (left axis, large scale). "
-        f"*Solid {signal_color} line* = Net P&L after friction (right axis, zoomed). "
-        "Net P&L is flat because arbitrage payoff is locked regardless of expiry price."
-    )
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 11. SCENARIO TABLE — FIX 7: Actual leg-by-leg P&L at each expiry price
@@ -450,57 +423,97 @@ scenario_prices = {
 rows = []
 for label, st_price in scenario_prices.items():
     if signal_type == "conversion":
-        # Long spot: profit when ST > S0
-        s_leg = (st_price - s0) * total_units
-        # Long put: pays (K - ST) if ST < K, costs premium always
-        p_leg = (max(strike - st_price, 0) - p_mkt) * total_units
-        # Short call: keeps premium, pays out (ST - K) if ST > K
-        c_leg = (c_mkt - max(st_price - strike, 0)) * total_units
-
+        s_leg   = (st_price - s0) * total_units
+        p_leg   = (max(strike - st_price, 0) - p_mkt) * total_units
+        c_leg   = (c_mkt - max(st_price - strike, 0)) * total_units
     elif signal_type == "reversal":
-        # Short spot: profit when ST < S0
-        s_leg = (s0 - st_price) * total_units
-        # Short put: keeps premium, pays out (K - ST) if ST < K
-        # At expiry: short put P&L = P_premium - max(K - ST, 0)
-        p_leg = (p_mkt - max(strike - st_price, 0)) * total_units
-        # Long call: pays premium, receives (ST - K) if ST > K
-        # At expiry: long call P&L = max(ST - K, 0) - C_premium
-        c_leg = (max(st_price - strike, 0) - c_mkt) * total_units
-
+        s_leg   = (s0 - st_price) * total_units
+        p_leg   = (p_mkt - max(strike - st_price, 0)) * total_units
+        c_leg   = (max(st_price - strike, 0) - c_mkt) * total_units
     else:
         s_leg = p_leg = c_leg = 0.0
 
-    gross = s_leg + p_leg + c_leg
-    # gross should equal spread_per_unit * total_units (locked)
-    # Net = gross - friction (same across all scenarios = Net Profit)
-    net = gross - total_friction
+    gross   = s_leg + p_leg + c_leg
+    net     = gross - total_friction
 
     rows.append({
-        "Scenario":      label,
-        "Expiry Price":  f"₹{st_price:,.0f}",
-        "Spot Leg (₹)":  f"₹{s_leg:,.2f}",
-        "Put Leg (₹)":   f"₹{p_leg:,.2f}",
-        "Call Leg (₹)":  f"₹{c_leg:,.2f}",
-        "Gross P&L (₹)": f"₹{gross:,.2f}",
-        "Friction (₹)":  f"−₹{total_friction:,.2f}",
-        "Net P&L (₹)":   f"₹{net:,.2f}",
+        "Scenario":       label,
+        "Expiry Price":   f"₹{st_price:,.0f}",
+        "Spot Leg (₹)":   f"₹{s_leg:,.2f}",
+        "Put Leg (₹)":    f"₹{p_leg:,.2f}",
+        "Call Leg (₹)":   f"₹{c_leg:,.2f}",
+        "Gross P&L (₹)":  f"₹{gross:,.2f}",
+        "Friction (₹)":   f"−₹{total_friction:,.2f}",
+        "Net P&L (₹)":    f"₹{net:,.2f}",
     })
 
 scenario_df = pd.DataFrame(rows)
 st.dataframe(scenario_df, hide_index=True, use_container_width=True)
 
-# Explain the key insight
-gross_check = abs(spread_per_unit) * total_units
-st.info(
-    f"*Why is Net P&L the same in every row?* — This is the core proof of arbitrage. "
-    f"No matter where the stock expires, the three legs (spot + put + call) always net to "
-    f"the same locked gross spread of *₹{gross_check:,.2f}*. "
-    f"After subtracting fixed friction of *₹{total_friction:,.2f}*, "
-    f"you always get *₹{net_pnl:,.2f}* — identical to 'Net Profit' above. "
-    f"The individual legs move wildly but perfectly offset each other — that's put-call parity at work."
-)
-
 # ─────────────────────────────────────────────────────────────────────────────
 # 12. SENSITIVITY: HOW MANY LOTS TO BREAK EVEN?
 # ─────────────────────────────────────────────────────────────────────────────
-if signal_type != "none" and abs
+if signal_type != "none" and abs(spread_per_unit) > 0:
+    st.divider()
+    st.subheader("🔍 Break-Even & Sensitivity")
+
+    col_be1, col_be2 = st.columns(2)
+
+    with col_be1:
+        # Minimum lots to cover friction
+        # net_pnl(n) = |spread| * n * lot - [brokerage*(2*n+2) + stt_spot(n) + stt_options(n)] = 0
+        # Solve numerically
+        for n in range(1, 501):
+            tu = n * lot
+            b_cost = brokerage * (2 * n + 2)
+            s_stt  = s0 * tu * 0.001
+            o_stt  = (c_mkt + p_mkt) * tu * 0.000625
+            fric   = b_cost + s_stt + o_stt
+            gross_ = abs(spread_per_unit) * tu
+            if gross_ >= fric:
+                break_even_lots = n
+                break
+        else:
+            break_even_lots = None
+
+        if break_even_lots:
+            st.metric("Break-Even Lots", f"{break_even_lots} lots",
+                      delta=f"You selected {num_lots} lots",
+                      delta_color="normal" if num_lots >= break_even_lots else "inverse")
+        else:
+            st.warning("This opportunity cannot be made profitable even with 500 lots.")
+
+    with col_be2:
+        # Show net PnL vs lot count (1 to min(num_lots*3, 50))
+        lot_range = range(1, min(num_lots * 4 + 1, 51))
+        pnl_by_lots = []
+        for n in lot_range:
+            tu = n * lot
+            b_cost = brokerage * (2 * n + 2)
+            s_stt  = s0 * tu * 0.001
+            o_stt  = (c_mkt + p_mkt) * tu * 0.000625
+            fric   = b_cost + s_stt + o_stt
+            pnl_by_lots.append(abs(spread_per_unit) * tu - fric)
+
+        fig2 = go.Figure()
+        fig2.add_trace(go.Bar(
+            x=list(lot_range),
+            y=pnl_by_lots,
+            marker_color=[signal_color if p > 0 else "#dc3545" for p in pnl_by_lots],
+            name="Net P&L"
+        ))
+        fig2.add_hline(y=0, line_dash="dash", line_color="gray")
+        fig2.update_layout(
+            title="Net P&L vs Number of Lots",
+            xaxis_title="Number of Lots",
+            yaxis_title="Net P&L (₹)",
+            height=260,
+            margin=dict(t=35, b=30, l=0, r=0),
+            plot_bgcolor="#f8f9fa",
+            paper_bgcolor="white",
+            showlegend=False,
+        )
+        fig2.update_yaxes(tickformat="₹,.0f")
+        st.plotly_chart(fig2, use_container_width=True)
+
+# ──────────────
