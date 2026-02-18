@@ -23,7 +23,7 @@ st.title("🏛️ Cross-Asset Arbitrage Opportunity Monitor")
 # --- 2. ASSET MASTER DATA ---
 ticker_map = {"NIFTY": "^NSEI", "RELIANCE": "RELIANCE.NS", "TCS": "TCS.NS", "SBIN": "SBIN.NS", "INFY": "INFY.NS"}
 lot_sizes = {"NIFTY": 65, "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
-# Fixed strike steps based on asset rules
+# Asset-specific strike steps for accurate +/- button behavior
 strike_steps = {"NIFTY": 50.0, "RELIANCE": 20.0, "TCS": 20.0, "SBIN": 5.0, "INFY": 10.0}
 
 with st.sidebar:
@@ -36,7 +36,7 @@ with st.sidebar:
     brokerage = st.number_input("Brokerage/Side (₹)", value=20.0)
     margin_pct = st.slider("Margin Requirement (%)", 10, 40, 20) / 100
 
-# --- 3. IMPROVED DATA ENGINE ---
+# --- 3. DYNAMIC DATA ENGINE ---
 @st.cache_data(ttl=30)
 def get_market_data(ticker):
     try:
@@ -44,30 +44,28 @@ def get_market_data(ticker):
         hist = stock.history(period="1d")
         spot = hist['Close'].iloc[-1] if not hist.empty else 0.0
         
-        # Robust expiry check to prevent "Expiry: N/A"
+        # Check for options to avoid "Expiry: N/A"
         options_list = stock.options
         if options_list and len(options_list) > 0:
             expiry = options_list[0]
             chain = stock.option_chain(expiry)
             return round(spot, 2), chain.calls, chain.puts, expiry
-        else:
-            return round(spot, 2), pd.DataFrame(), pd.DataFrame(), "No Active Expiry"
-    except Exception as e:
-        return 0.0, pd.DataFrame(), pd.DataFrame(), f"Error: {str(e)}"
+        return round(spot, 2), pd.DataFrame(), pd.DataFrame(), "No Active Expiry"
+    except:
+        return 0.0, pd.DataFrame(), pd.DataFrame(), "Connection Error"
 
 s0, calls_df, puts_df, current_expiry = get_market_data(ticker_map[asset])
 lot = lot_sizes[asset]
 total_units = num_lots * lot
 step_val = strike_steps[asset]
 
-# STRIKE SELECTION
+# --- 4. PRICE LOOKUP LOGIC ---
 c1, c2, c3 = st.columns(3)
 with c1:
-    # Dynamically round to the correct step for the selected asset
     default_strike = float(round(s0 / step_val) * step_val)
     strike = st.number_input("Strike Price", value=default_strike, step=step_val)
 
-# DYNAMIC CALL/PUT LOOKUP WITH DYNAMIC KEYS
+# Lookup Call Price
 with c2:
     val_c = 0.0
     if not calls_df.empty:
@@ -75,11 +73,11 @@ with c2:
         if not match_c.empty:
             val_c = match_c['lastPrice'].values[0]
     
-    if val_c <= 0 or np.isnan(val_c):
-        val_c = round(s0 * 0.025, 2)
-    # Dynamic key forces Streamlit to refresh this widget when asset or strike changes
-    c_mkt = st.number_input("Call Price", value=float(val_c), key=f"c_in_{asset}_{strike}")
+    # Fallback to prevent empty UI
+    if val_c <= 0: val_c = round(s0 * 0.025, 2)
+    c_mkt = st.number_input("Call Price", value=float(val_c), key=f"c_{asset}_{strike}")
 
+# Lookup Put Price
 with c3:
     val_p = 0.0
     if not puts_df.empty:
@@ -87,11 +85,10 @@ with c3:
         if not match_p.empty:
             val_p = match_p['lastPrice'].values[0]
         
-    if val_p <= 0 or np.isnan(val_p):
-        val_p = round(s0 * 0.018, 2)
-    p_mkt = st.number_input("Put Price", value=float(val_p), key=f"p_in_{asset}_{strike}")
+    if val_p <= 0: val_p = round(s0 * 0.018, 2)
+    p_mkt = st.number_input("Put Price", value=float(val_p), key=f"p_{asset}_{strike}")
 
-# --- 4. CALCULATIONS ---
+# --- 5. CALCULATIONS ---
 t = days_to_expiry / 365
 pv_k = strike * np.exp(-r_rate * t)
 synthetic_spot = c_mkt - p_mkt + pv_k
@@ -109,14 +106,13 @@ elif spread_per_unit < -0.1:
 else:
     signal_line, signal_color, net_pnl, strategy_desc = "MARKET IS EFFICIENT", "#6c757d", 0.0, "No Action"
 
-# --- 5. UI DISPLAY ---
+# --- 6. UI DISPLAY ---
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Market Spot", f"₹{s0:,.2f}")
 m2.metric("Synthetic Price", f"₹{synthetic_spot:,.2f}")
 m3.metric("Arbitrage Gap", f"₹{abs(spread_per_unit):.2f}")
 m4.metric("Capital Req.", f"₹{capital_req:,.0f}")
 
-# Banner showing the detected Expiry
 st.markdown(f'''
     <div style="background-color:{signal_color}; padding:15px; border-radius:10px; text-align:center; color:white;">
         <h2 style="margin:0;">{signal_line}</h2>
@@ -135,12 +131,12 @@ with col_proof:
     st.write(f"Profit is locked for {total_units} units.")
 
 with col_graph:
+    # Visualization of the risk-neutral payoff
     prices = np.linspace(s0*0.8, s0*1.2, 10)
     fig = go.Figure(go.Scatter(x=prices, y=[net_pnl]*10, mode='lines', line=dict(color=signal_color, width=4)))
     fig.update_layout(title="Risk-Neutral Payoff", height=280, margin=dict(t=30, b=0, l=0, r=0))
     st.plotly_chart(fig, use_container_width=True)
 
-# --- 6. SCENARIO TABLE ---
 st.divider()
 st.subheader("📉 Expiry Scenario Analysis")
 scenarios = [s0 * 0.9, s0, s0 * 1.1]
