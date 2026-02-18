@@ -21,10 +21,10 @@ st.markdown("""
 st.title("🏛️ Cross-Asset Arbitrage Opportunity Monitor")
 
 # --- 2. ASSET MASTER DATA ---
-# Updated with correct strike steps for each asset
 ticker_map = {"NIFTY": "^NSEI", "RELIANCE": "RELIANCE.NS", "TCS": "TCS.NS", "SBIN": "SBIN.NS", "INFY": "INFY.NS"}
 lot_sizes = {"NIFTY": 65, "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
-strike_steps = {"NIFTY": 50.0, "RELIANCE": 10.0, "TCS": 10.0, "SBIN": 5.0, "INFY": 10.0}
+# Fixed strike steps based on asset rules
+strike_steps = {"NIFTY": 50.0, "RELIANCE": 20.0, "TCS": 20.0, "SBIN": 5.0, "INFY": 10.0}
 
 with st.sidebar:
     st.header("⚙️ Parameters")
@@ -36,21 +36,24 @@ with st.sidebar:
     brokerage = st.number_input("Brokerage/Side (₹)", value=20.0)
     margin_pct = st.slider("Margin Requirement (%)", 10, 40, 20) / 100
 
-# --- 3. DYNAMIC DATA ENGINE ---
-@st.cache_data(ttl=15) # Shorter TTL for faster updates
+# --- 3. IMPROVED DATA ENGINE ---
+@st.cache_data(ttl=30)
 def get_market_data(ticker):
     try:
         stock = yf.Ticker(ticker)
         hist = stock.history(period="1d")
         spot = hist['Close'].iloc[-1] if not hist.empty else 0.0
         
-        if stock.options:
-            expiry = stock.options[0]
+        # Robust expiry check to prevent "Expiry: N/A"
+        options_list = stock.options
+        if options_list and len(options_list) > 0:
+            expiry = options_list[0]
             chain = stock.option_chain(expiry)
             return round(spot, 2), chain.calls, chain.puts, expiry
-        return round(spot, 2), pd.DataFrame(), pd.DataFrame(), "N/A"
-    except:
-        return 0.0, pd.DataFrame(), pd.DataFrame(), "N/A"
+        else:
+            return round(spot, 2), pd.DataFrame(), pd.DataFrame(), "No Active Expiry"
+    except Exception as e:
+        return 0.0, pd.DataFrame(), pd.DataFrame(), f"Error: {str(e)}"
 
 s0, calls_df, puts_df, current_expiry = get_market_data(ticker_map[asset])
 lot = lot_sizes[asset]
@@ -60,34 +63,33 @@ step_val = strike_steps[asset]
 # STRIKE SELECTION
 c1, c2, c3 = st.columns(3)
 with c1:
-    # Logic to round to nearest valid strike based on asset-specific step
+    # Dynamically round to the correct step for the selected asset
     default_strike = float(round(s0 / step_val) * step_val)
     strike = st.number_input("Strike Price", value=default_strike, step=step_val)
 
-# DYNAMIC CALL/PUT LOOKUP
-# We use .get() to ensure that switching assets forces the price to refresh
+# DYNAMIC CALL/PUT LOOKUP WITH DYNAMIC KEYS
 with c2:
     val_c = 0.0
     if not calls_df.empty:
-        match = calls_df[calls_df['strike'] == strike]
-        if not match.empty:
-            val_c = match['lastPrice'].values[0]
+        match_c = calls_df[calls_df['strike'] == strike]
+        if not match_c.empty:
+            val_c = match_c['lastPrice'].values[0]
     
-    # Fallback if strike is not in chain
-    if val_c == 0.0:
-        val_c = round(s0 * 0.02, 2) 
-    c_mkt = st.number_input("Call Price", value=float(val_c), key=f"c_{asset}_{strike}")
+    if val_c <= 0 or np.isnan(val_c):
+        val_c = round(s0 * 0.025, 2)
+    # Dynamic key forces Streamlit to refresh this widget when asset or strike changes
+    c_mkt = st.number_input("Call Price", value=float(val_c), key=f"c_in_{asset}_{strike}")
 
 with c3:
     val_p = 0.0
     if not puts_df.empty:
-        match = puts_df[puts_df['strike'] == strike]
-        if not match.empty:
-            val_p = match['lastPrice'].values[0]
+        match_p = puts_df[puts_df['strike'] == strike]
+        if not match_p.empty:
+            val_p = match_p['lastPrice'].values[0]
         
-    if val_p == 0.0:
-        val_p = round(s0 * 0.015, 2)
-    p_mkt = st.number_input("Put Price", value=float(val_p), key=f"p_{asset}_{strike}")
+    if val_p <= 0 or np.isnan(val_p):
+        val_p = round(s0 * 0.018, 2)
+    p_mkt = st.number_input("Put Price", value=float(val_p), key=f"p_in_{asset}_{strike}")
 
 # --- 4. CALCULATIONS ---
 t = days_to_expiry / 365
@@ -114,7 +116,13 @@ m2.metric("Synthetic Price", f"₹{synthetic_spot:,.2f}")
 m3.metric("Arbitrage Gap", f"₹{abs(spread_per_unit):.2f}")
 m4.metric("Capital Req.", f"₹{capital_req:,.0f}")
 
-st.markdown(f'<div style="background-color:{signal_color}; padding:15px; border-radius:10px; text-align:center; color:white;"><h2 style="margin:0;">{signal_line}</h2><p style="margin:0;">Expiry: {current_expiry}</p></div>', unsafe_allow_html=True)
+# Banner showing the detected Expiry
+st.markdown(f'''
+    <div style="background-color:{signal_color}; padding:15px; border-radius:10px; text-align:center; color:white;">
+        <h2 style="margin:0;">{signal_line}</h2>
+        <p style="margin:0; font-weight:bold;">Expiry: {current_expiry}</p>
+    </div>
+    ''', unsafe_allow_html=True)
 
 st.write("")
 col_proof, col_graph = st.columns([1, 1.2])
@@ -132,6 +140,7 @@ with col_graph:
     fig.update_layout(title="Risk-Neutral Payoff", height=280, margin=dict(t=30, b=0, l=0, r=0))
     st.plotly_chart(fig, use_container_width=True)
 
+# --- 6. SCENARIO TABLE ---
 st.divider()
 st.subheader("📉 Expiry Scenario Analysis")
 scenarios = [s0 * 0.9, s0, s0 * 1.1]
