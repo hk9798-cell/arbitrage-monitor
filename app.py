@@ -21,8 +21,10 @@ st.markdown("""
 st.title("🏛️ Cross-Asset Arbitrage Opportunity Monitor")
 
 # --- 2. ASSET MASTER DATA ---
+# Updated with correct strike steps for each asset
 ticker_map = {"NIFTY": "^NSEI", "RELIANCE": "RELIANCE.NS", "TCS": "TCS.NS", "SBIN": "SBIN.NS", "INFY": "INFY.NS"}
 lot_sizes = {"NIFTY": 65, "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
+strike_steps = {"NIFTY": 50.0, "RELIANCE": 10.0, "TCS": 10.0, "SBIN": 5.0, "INFY": 10.0}
 
 with st.sidebar:
     st.header("⚙️ Parameters")
@@ -35,51 +37,57 @@ with st.sidebar:
     margin_pct = st.slider("Margin Requirement (%)", 10, 40, 20) / 100
 
 # --- 3. DYNAMIC DATA ENGINE ---
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=15) # Shorter TTL for faster updates
 def get_market_data(ticker):
     try:
         stock = yf.Ticker(ticker)
         hist = stock.history(period="1d")
-        spot = hist['Close'].iloc[-1] if not hist.empty else 25725.40
+        spot = hist['Close'].iloc[-1] if not hist.empty else 0.0
         
         if stock.options:
-            expiry = stock.options[0] # Fetches nearest actual expiry
+            expiry = stock.options[0]
             chain = stock.option_chain(expiry)
             return round(spot, 2), chain.calls, chain.puts, expiry
         return round(spot, 2), pd.DataFrame(), pd.DataFrame(), "N/A"
     except:
-        return 25725.40, pd.DataFrame(), pd.DataFrame(), "N/A"
+        return 0.0, pd.DataFrame(), pd.DataFrame(), "N/A"
 
 s0, calls_df, puts_df, current_expiry = get_market_data(ticker_map[asset])
 lot = lot_sizes[asset]
 total_units = num_lots * lot
+step_val = strike_steps[asset]
 
 # STRIKE SELECTION
 c1, c2, c3 = st.columns(3)
 with c1:
-    default_strike = float(round(s0/50)*50) if "NIFTY" in asset else float(round(s0/10)*10)
-    strike = st.number_input("Strike Price", value=default_strike, step=50.0 if "NIFTY" in asset else 10.0)
+    # Logic to round to nearest valid strike based on asset-specific step
+    default_strike = float(round(s0 / step_val) * step_val)
+    strike = st.number_input("Strike Price", value=default_strike, step=step_val)
 
 # DYNAMIC CALL/PUT LOOKUP
+# We use .get() to ensure that switching assets forces the price to refresh
 with c2:
     val_c = 0.0
-    if not calls_df.empty and strike in calls_df['strike'].values:
-        val_c = calls_df[calls_df['strike'] == strike]['lastPrice'].values[0]
+    if not calls_df.empty:
+        match = calls_df[calls_df['strike'] == strike]
+        if not match.empty:
+            val_c = match['lastPrice'].values[0]
     
-    if val_c <= 0 or np.isnan(val_c):
-        val_c = round(s0 * 0.025, 2)
-    # The 'value' is now tied to val_c, making it update when strike changes
-    c_mkt = st.number_input("Call Price", value=float(val_c), key="call_input")
+    # Fallback if strike is not in chain
+    if val_c == 0.0:
+        val_c = round(s0 * 0.02, 2) 
+    c_mkt = st.number_input("Call Price", value=float(val_c), key=f"c_{asset}_{strike}")
 
 with c3:
     val_p = 0.0
-    if not puts_df.empty and strike in puts_df['strike'].values:
-        val_p = puts_df[puts_df['strike'] == strike]['lastPrice'].values[0]
+    if not puts_df.empty:
+        match = puts_df[puts_df['strike'] == strike]
+        if not match.empty:
+            val_p = match['lastPrice'].values[0]
         
-    if val_p <= 0 or np.isnan(val_p):
-        val_p = round(s0 * 0.018, 2)
-    # The 'value' is now tied to val_p
-    p_mkt = st.number_input("Put Price", value=float(val_p), key="put_input")
+    if val_p == 0.0:
+        val_p = round(s0 * 0.015, 2)
+    p_mkt = st.number_input("Put Price", value=float(val_p), key=f"p_{asset}_{strike}")
 
 # --- 4. CALCULATIONS ---
 t = days_to_expiry / 365
@@ -124,7 +132,6 @@ with col_graph:
     fig.update_layout(title="Risk-Neutral Payoff", height=280, margin=dict(t=30, b=0, l=0, r=0))
     st.plotly_chart(fig, use_container_width=True)
 
-# --- 6. SCENARIO TABLE ---
 st.divider()
 st.subheader("📉 Expiry Scenario Analysis")
 scenarios = [s0 * 0.9, s0, s0 * 1.1]
