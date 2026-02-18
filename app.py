@@ -12,7 +12,7 @@ st.markdown("""
     .main { background-color: #f0f2f6; }
     label[data-testid="stWidgetLabel"] p { font-weight: bold !important; font-size: 16px !important; }
     div[data-testid="stMetricLabel"] p { font-weight: bold !important; font-size: 16px !important; }
-    div[data-testid="stMetricValue"] { font-size: 28px; color: #1f77b4; font-weight: bold; }
+    div[data-testid="stMetricValue"] { font-size: 24px; color: #1f77b4; font-weight: bold; }
     .stTable { border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
     </style>
     """, unsafe_allow_html=True)
@@ -34,34 +34,34 @@ with st.sidebar:
     brokerage = st.number_input("Brokerage/Side (₹)", value=20.0)
     margin_pct = st.slider("Margin Requirement (%)", 10, 40, 20) / 100
 
-# --- 3. DATA ENGINE (With Smart Recovery) ---
-@st.cache_data(ttl=10)
+# --- 3. DATA ENGINE ---
+@st.cache_data(ttl=20)
 def get_market_data(ticker_symbol):
     try:
         stock = yf.Ticker(ticker_symbol)
-        # Fast spot price fetch
-        data = stock.fast_info
-        spot = data['last_price'] if 'last_price' in data else 0.0
+        hist = stock.history(period="1d")
+        spot = hist['Close'].iloc[-1] if not hist.empty else 0.0
         
         options = stock.options
         if options:
             expiry = options[0]
             chain = stock.option_chain(expiry)
             return round(spot, 2), chain.calls, chain.puts, expiry
-        return round(spot, 2), pd.DataFrame(), pd.DataFrame(), "Waiting for Market..."
+        return round(spot, 2), pd.DataFrame(), pd.DataFrame(), "Fetching Expiry..."
     except:
-        return 0.0, pd.DataFrame(), pd.DataFrame(), "Data Link Error"
+        return 0.0, pd.DataFrame(), pd.DataFrame(), "Connection Error"
 
 s0, calls_df, puts_df, current_expiry = get_market_data(ticker_map[asset])
 lot = lot_sizes[asset]
 total_units = num_lots * lot
 step_val = strike_steps[asset]
 
-# --- 4. PRICE LOOKUP ---
+# --- 4. PRICE LOOKUP (FIXED STRIKE RESET) ---
 c1, c2, c3 = st.columns(3)
 with c1:
-    default_strike = float(round(s0 / step_val) * step_val) if s0 > 0 else 25800.0
-    strike = st.number_input("Strike Price", value=default_strike, step=step_val)
+    # This logic ensures if you pick TCS, the strike isn't stuck at NIFTY's 25800
+    calc_default_strike = float(round(s0 / step_val) * step_val) if s0 > 0 else 100.0
+    strike = st.number_input("Strike Price", value=calc_default_strike, step=step_val, key=f"strike_{asset}")
 
 with c2:
     val_c = 0.0
@@ -69,10 +69,8 @@ with c2:
         match = calls_df[calls_df['strike'] == strike]
         if not match.empty:
             val_c = match['lastPrice'].values[0]
-    
-    # If the live lookup fails, we show a 'zero' but allow you to type in manually 
-    # as seen in your Nifty app screenshot (₹174.50)
-    c_mkt = st.number_input("Call Price (LTP)", value=float(val_c), key=f"c_{asset}_{strike}")
+    # Allow manual override if live data is slow
+    c_mkt = st.number_input("Call Price (LTP)", value=float(val_c), key=f"c_val_{asset}_{strike}")
 
 with c3:
     val_p = 0.0
@@ -80,8 +78,7 @@ with c3:
         match = puts_df[puts_df['strike'] == strike]
         if not match.empty:
             val_p = match['lastPrice'].values[0]
-            
-    p_mkt = st.number_input("Put Price (LTP)", value=float(val_p), key=f"p_{asset}_{strike}")
+    p_mkt = st.number_input("Put Price (LTP)", value=float(val_p), key=f"p_val_{asset}_{strike}")
 
 # --- 5. CALCULATIONS ---
 t = days_to_expiry / 365
@@ -98,7 +95,7 @@ elif spread_per_unit < -0.5:
     sig_line, sig_col, strategy = "REVERSAL ARBITRAGE DETECTED", "#dc3545", "Short Spot, Sell Put, Buy Call"
     pnl = (abs(spread_per_unit) * total_units) - total_friction
 else:
-    sig_line, sig_col, pnl, strategy = "MARKET IS EFFICIENT", "#6c757d", 0.0, "No Action Required"
+    sig_line, sig_col, pnl, strategy = "MARKET IS EFFICIENT", "#6c757d", 0.0, "No Action"
 
 # --- 6. UI DISPLAY ---
 m1, m2, m3, m4 = st.columns(4)
@@ -119,14 +116,21 @@ with col_proof:
     st.metric("Net Profit", f"₹{pnl:,.2f}")
 
 with col_graph:
-    prices = np.linspace(s0*0.98, s0*1.02, 10) if s0 > 0 else np.linspace(25000, 26000, 10)
+    prices = np.linspace(s0*0.95, s0*1.05, 10) if s0 > 0 else np.linspace(100, 200, 10)
     fig = go.Figure(go.Scatter(x=prices, y=[pnl]*10, mode='lines', line=dict(color=sig_col, width=4)))
-    fig.update_layout(title="Risk-Neutral Payoff", height=250, margin=dict(t=30, b=0, l=0, r=0))
+    fig.update_layout(title="Payoff Graph", height=250, margin=dict(t=30, b=0, l=0, r=0))
     st.plotly_chart(fig, use_container_width=True)
 
-# --- 7. RESTORED SCENARIO TABLE ---
+# --- 7. SCENARIO ANALYSIS (RESTORED) ---
 st.divider()
 st.subheader("📉 Expiry Scenario Analysis")
-scenarios = [s0 * 0.95, s0, s0 * 1.05] if s0 > 0 else [25000, 25800, 26500]
-pdf = [{"Price at Expiry": f"₹{p:,.0f}", "Lot Size": lot, "Total Units": total_units, "TOTAL NET": f"₹{pnl:,.2f}"} for p in scenarios]
-st.table(pd.DataFrame(pdf))
+scenarios = [s0 * 0.9, s0, s0 * 1.1] if s0 > 0 else [0, 0, 0]
+scenario_data = []
+for p in scenarios:
+    scenario_data.append({
+        "Price at Expiry": f"₹{p:,.0f}",
+        "Lot Size": lot,
+        "Total Units": total_units,
+        "TOTAL NET": f"₹{pnl:,.2f}"
+    })
+st.table(pd.DataFrame(scenario_data))
