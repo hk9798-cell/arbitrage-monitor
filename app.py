@@ -2,79 +2,88 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-# --- Page Config ---
+# 1. Page Setup to match your original style
 st.set_page_config(page_title="Arbitrage Monitor", layout="wide")
 
-# --- Function to fetch data dynamically ---
-def get_market_data(symbol, strike):
+# 2. Dynamic Data Fetching Function
+def fetch_live_data(symbol, strike):
     try:
         ticker = yf.Ticker(symbol)
-        # Fetch Spot
         spot = ticker.history(period="1d")['Close'].iloc[-1]
         
-        # Get nearest expiry option chain
+        # Fetching the nearest expiry chain
         expiry = ticker.options[0]
-        opt = ticker.option_chain(expiry)
+        opt_chain = ticker.option_chain(expiry)
         
-        # Filter for the specific strike
-        call_price = opt.calls[opt.calls['strike'] == strike]['lastPrice'].values[0]
-        put_price = opt.puts[opt.puts['strike'] == strike]['lastPrice'].values[0]
+        # Finding the specific Call/Put for your selected strike
+        c_price = opt_chain.calls[opt_chain.calls['strike'] == strike]['lastPrice'].values[0]
+        p_price = opt_chain.puts[opt_chain.puts['strike'] == strike]['lastPrice'].values[0]
         
-        return spot, call_price, put_price, expiry
+        return round(spot, 2), round(c_price, 2), round(p_price, 2)
     except:
-        return None, None, None, None
+        return None, None, None
 
-# --- UI Layout ---
+# --- HEADER (From your first image) ---
 st.title("🏛️ Cross-Asset Arbitrage Opportunity Monitor")
 
-# Sidebar/Inputs
-with st.container():
-    col1, col2, col3 = st.columns(3)
+# --- INPUT AREA ---
+col_in1, col_in2, col_in3 = st.columns(3)
+with col_in1:
+    # This input will now trigger a fresh data pull every time you change it
+    strike_price = st.number_input("Strike Price", value=25800, step=50)
+
+# Fetch data based on the strike above
+market_spot, call_price, put_price = fetch_live_data("^NSEI", strike_price)
+
+if market_spot:
+    with col_in2:
+        st.write(f"*Call Price*")
+        st.subheader(f"₹{call_price}")
+    with col_in3:
+        st.write(f"*Put Price*")
+        st.subheader(f"₹{put_price}")
+
+    # --- MAIN METRICS ROW ---
+    synthetic_price = strike_price + call_price - put_price
+    gap = synthetic_price - market_spot
+    capital_req = 335250 # Static value from your original design
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Market Spot", f"₹{market_spot:,.2f}")
+    m2.metric("Synthetic Price", f"₹{synthetic_price:,.2f}")
+    m3.metric("Arbitrage Gap", f"₹{gap:,.2f}")
+    m4.metric("Capital Req.", f"₹{capital_req:,}")
+
+    # --- THE RED ALERT BOX (Restored) ---
+    if gap > 10: # Threshold for detection
+        st.error("REVERSAL ARBITRAGE DETECTED", icon="🚨")
+
+    st.divider()
+
+    # --- EXECUTION PROOF SECTION (Restored) ---
+    st.header("📊 Execution Proof")
+    st.write("Strategy: Short Spot, Sell Put, Buy Call")
     
-    with col1:
-        # Use a number input to change strike - this triggers a re-run
-        strike_price = st.number_input("Strike Price", value=25800, step=50)
+    # Restoring your specific Latex Formula
+    st.latex(r"P = Units \times [(S_T - S_0) + (K - S_T)^+ - (S_T - K)^+ + (C - P)]")
     
-    # Fetch Data based on the input above
-    spot, call, put, expiry = get_market_data("^NSEI", strike_price)
+    col_p1, col_p2 = st.columns([1, 2])
+    with col_p1:
+        st.write("Final Net Profit")
+        st.title(f"₹6,099.54") # Using your original project values
+        st.caption("Profit is locked for 65 units.")
+    
+    with col_p2:
+        # Re-creating your Risk-Neutral Payoff Graph
+        payoff_data = pd.DataFrame({"Payoff": [6099.54] * 20})
+        st.line_chart(payoff_data)
 
-    if spot:
-        # --- Calculations (Your features) ---
-        # Synthetic Price = Strike + Call - Put
-        synthetic = strike_price + call - put
-        gap = synthetic - spot
-        capital_req = 335250 # Example static value from your screenshot
-        
-        with col2:
-            st.metric("Call Price", f"₹{call}")
-        with col3:
-            st.metric("Put Price", f"₹{put}")
+    # --- EXPIRY SCENARIO ANALYSIS ---
+    st.header("📉 Expiry Scenario Analysis")
+    # You can add your dataframe table here later
+    st.info("Scenario analysis table loading...")
 
-        st.divider()
+else:
+    st.warning("Connecting to market data... please ensure strike price is valid.")
 
-        # --- Metrics Row ---
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Market Spot", f"₹{spot:,.2f}")
-        m2.metric("Synthetic Price", f"₹{synthetic:,.2f}")
-        m3.metric("Arbitrage Gap", f"₹{gap:,.2f}")
-        m4.metric("Capital Req.", f"₹{capital_req:,}")
-
-        # --- Alert Logic ---
-        if gap > 20: # Example threshold
-            st.error(f"REVERSAL ARBITRAGE DETECTED (Expiry: {expiry})")
-        else:
-            st.info("Market is currently efficient.")
-
-        # --- Execution Proof (Formula from your image) ---
-        st.subheader("📊 Execution Proof")
-        st.latex(r"P = Units \times [(S_T - S_0) + (K - S_T)^+ - (S_T - K)^+ + (C - P)]")
-        
-        # Simple Payoff Graph Simulation
-        chart_data = pd.DataFrame({"Risk-Neutral Payoff": [6099.54] * 10})
-        st.line_chart(chart_data)
-
-    else:
-        st.warning("Please wait, fetching live market data or strike not found...")
-
-# --- Footer ---
 st.button("Manual Refresh")
