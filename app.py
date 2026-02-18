@@ -1,146 +1,119 @@
-import streamlit as st
+import tkinter as tk
+from tkinter import ttk
 import yfinance as yf
-import numpy as np
-import pandas as pd
-import plotly.graph_objects as go
+import threading
+import time
 
-# --- 1. CONFIG & UI STYLING ---
-st.set_page_config(page_title="Arbitrage Monitor", layout="wide")
-
-st.markdown("""
-    <style>
-    .main { background-color: #f0f2f6; }
-    
-    /* BOLD LABELS FOR INPUTS AND METRICS */
-    label[data-testid="stWidgetLabel"] p {
-        font-weight: bold !important;
-        font-size: 16px !important;
-    }
-    
-    div[data-testid="stMetricLabel"] p { 
-        font-weight: bold !important; 
-        font-size: 16px !important; 
-    }
-    
-    div[data-testid="stMetricValue"] { font-size: 28px; color: #1f77b4; font-weight: bold; }
-    .stTable { border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-    
-    .strategy-text {
-        font-weight: bold;
-        font-size: 18px;
-        margin-bottom: 5px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-st.title("🏛️ Cross-Asset Arbitrage Opportunity Monitor")
-
-# --- 2. ASSET MASTER DATA ---
-ticker_map = {"NIFTY": "^NSEI", "RELIANCE": "RELIANCE.NS", "TCS": "TCS.NS", "SBIN": "SBIN.NS", "INFY": "INFY.NS"}
-lot_sizes = {"NIFTY": 65, "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
-
-with st.sidebar:
-    st.header("⚙️ Parameters")
-    asset = st.selectbox("Select Asset", list(ticker_map.keys()))
-    num_lots = st.number_input("Number of Lots", min_value=1, value=1)
-    r_rate = st.slider("Risk-Free Rate (%)", 4.0, 10.0, 6.75) / 100
-    days_to_expiry = st.number_input("Days to Expiry", value=15, min_value=1)
-    st.divider()
-    brokerage = st.number_input("Brokerage/Side (₹)", value=20.0)
-    margin_pct = st.slider("Margin Requirement (%)", 10, 40, 20) / 100
-
-# --- 3. STABLE DATA ENGINE ---
-@st.cache_data(ttl=30)
-def get_market_data(ticker):
-    try:
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period="1d")
-        spot = hist['Close'].iloc[-1] if not hist.empty else 25725.40
+class ArbitrageApp:
+    def _init_(self, root):
+        self.root = root
+        self.root.title("Arbitrage Opportunity Monitor")
+        self.root.geometry("400x500")
         
-        if stock.options:
-            expiry = stock.options[0]
-            chain = stock.option_chain(expiry)
-            return round(spot, 2), chain.calls, chain.puts
-        return round(spot, 2), pd.DataFrame(), pd.DataFrame()
-    except:
-        return 25725.40, pd.DataFrame(), pd.DataFrame()
-
-s0, calls_df, puts_df = get_market_data(ticker_map[asset])
-lot = lot_sizes[asset]
-total_units = num_lots * lot
-
-# STRIKE SELECTION
-c1, c2, c3 = st.columns(3)
-with c1:
-    default_strike = float(round(s0/50)*50) if "NIFTY" in asset else float(round(s0/10)*10)
-    strike = st.number_input("Strike Price", value=default_strike, step=50.0 if "NIFTY" in asset else 10.0)
-
-# DYNAMIC CALL/PUT LOOKUP WITH ERROR PROTECTION
-with c2:
-    val_c = 0.0
-    if not calls_df.empty and strike in calls_df['strike'].values:
-        val_c = calls_df[calls_df['strike'] == strike]['lastPrice'].values[0]
-    
-    # Fallback if price is missing or 0 to prevent UI mess
-    if val_c <= 0 or np.isnan(val_c):
-        val_c = round(s0 * 0.025, 2)
-    c_mkt = st.number_input("Call Price", value=float(val_c))
-
-with c3:
-    val_p = 0.0
-    if not puts_df.empty and strike in puts_df['strike'].values:
-        val_p = puts_df[puts_df['strike'] == strike]['lastPrice'].values[0]
+        # --- State Variables ---
+        self.symbol = "^NSEI"  # Nifty 50
+        self.strike_price = tk.IntVar(value=23500)
+        self.spot_val = tk.DoubleVar(value=0.0)
+        self.call_val = tk.DoubleVar(value=0.0)
+        self.put_val = tk.DoubleVar(value=0.0)
+        self.synthetic_val = tk.DoubleVar(value=0.0)
+        self.gap_val = tk.DoubleVar(value=0.0)
         
-    if val_p <= 0 or np.isnan(val_p):
-        val_p = round(s0 * 0.018, 2)
-    p_mkt = st.number_input("Put Price", value=float(val_p))
+        self.create_widgets()
+        
+        # Start the background data thread
+        self.update_thread = threading.Thread(target=self.data_loop, daemon=True)
+        self.update_thread.start()
 
-# --- 4. CALCULATIONS ---
-t = days_to_expiry / 365
-pv_k = strike * np.exp(-r_rate * t)
-synthetic_spot = c_mkt - p_mkt + pv_k
-spread_per_unit = s0 - synthetic_spot
-total_friction = (brokerage * 3 * num_lots) + (s0 * total_units * 0.001)
-capital_req = (s0 * total_units) * margin_pct
+    def create_widgets(self):
+        # Header
+        ttk.Label(self.root, text="Market Arbitrage Monitor", font=("Arial", 16, "bold")).pack(pady=10)
+        
+        # Spot Price Display
+        frame_spot = ttk.Frame(self.root)
+        frame_spot.pack(pady=5)
+        ttk.Label(frame_spot, text="Nifty Spot: ").pack(side="left")
+        ttk.Label(frame_spot, textvariable=self.spot_val, foreground="blue", font=("Arial", 12, "bold")).pack(side="left")
 
-# Signal Logic
-if spread_per_unit > 0.1:
-    signal_line, signal_color, strategy_desc = "CONVERSION ARBITRAGE DETECTED", "#28a745", "Buy Spot, Buy Put, Sell Call"
-    net_pnl = (spread_per_unit * total_units) - total_friction
-elif spread_per_unit < -0.1:
-    signal_line, signal_color, strategy_desc = "REVERSAL ARBITRAGE DETECTED", "#dc3545", "Short Spot, Sell Put, Buy Call"
-    net_pnl = (abs(spread_per_unit) * total_units) - total_friction
-else:
-    signal_line, signal_color, net_pnl, strategy_desc = "MARKET IS EFFICIENT", "#6c757d", 0, "No Action"
+        # Strike Price Selector (+ / - Buttons)
+        frame_strike = ttk.LabelFrame(self.root, text="Select Strike Price", padding=10)
+        frame_strike.pack(pady=10, fill="x", padx=20)
+        
+        ttk.Button(frame_strike, text="-", command=lambda: self.adjust_strike(-50)).pack(side="left", expand=True)
+        ttk.Label(frame_strike, textvariable=self.strike_price, font=("Arial", 14, "bold")).pack(side="left", expand=True)
+        ttk.Button(frame_strike, text="+", command=lambda: self.adjust_strike(50)).pack(side="left", expand=True)
 
-# --- 5. UI DISPLAY (SIDE-BY-SIDE) ---
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Market Spot", f"₹{s0:,.2f}")
-m2.metric("Synthetic Price", f"₹{synthetic_spot:,.2f}")
-m3.metric("Arbitrage Gap", f"₹{abs(spread_per_unit):.2f}")
-m4.metric("Capital Req.", f"₹{capital_req:,.0f}")
+        # Data Display Table
+        data_frame = ttk.Frame(self.root)
+        data_frame.pack(pady=20)
 
-st.markdown(f'<div style="background-color:{signal_color}; padding:15px; border-radius:10px; text-align:center; color:white;"><h2 style="margin:0;">{signal_line}</h2></div>', unsafe_allow_html=True)
+        rows = [
+            ("Call Price (CE):", self.call_val),
+            ("Put Price (PE):", self.put_val),
+            ("Synthetic Price:", self.synthetic_val),
+            ("Arbitrage Gap:", self.gap_val)
+        ]
 
-st.write("")
-col_proof, col_graph = st.columns([1, 1.2])
+        for i, (label_text, var) in enumerate(rows):
+            ttk.Label(data_frame, text=label_text, font=("Arial", 10)).grid(row=i, column=0, sticky="w", pady=5, padx=10)
+            ttk.Label(data_frame, textvariable=var, font=("Arial", 10, "bold")).grid(row=i, column=1, sticky="e", pady=5)
 
-with col_proof:
-    st.subheader("📊 Execution Proof")
-    st.markdown(f'<div class="strategy-text">Strategy: {strategy_desc}</div>', unsafe_allow_html=True)
-    st.latex(r"P = Units \times [ (S_{T} - S_{0}) + (K - S_{T})^{+} - (S_{T} - K)^{+} + (C - P) ]")
-    st.metric("Final Net Profit", f"₹{net_pnl:,.2f}")
-    st.write(f"Profit is locked for {total_units} units.")
+        # Indicator Light for Arbitrage
+        self.status_label = ttk.Label(self.root, text="Scanning Market...", foreground="gray")
+        self.status_label.pack(pady=20)
 
-with col_graph:
-    prices = np.linspace(s0*0.8, s0*1.2, 10)
-    fig = go.Figure(go.Scatter(x=prices, y=[net_pnl]*10, mode='lines', line=dict(color=signal_color, width=4)))
-    fig.update_layout(title="Risk-Neutral Payoff", height=280, margin=dict(t=30, b=0, l=0, r=0))
-    st.plotly_chart(fig, use_container_width=True)
+    def adjust_strike(self, amount):
+        self.strike_price.set(self.strike_price.get() + amount)
+        self.status_label.config(text="Updating for new strike...", foreground="orange")
 
-# --- 6. SCENARIO TABLE (WITH LOTS) ---
-st.divider()
-st.subheader("📉 Expiry Scenario Analysis")
-scenarios = [s0 * 0.9, s0, s0 * 1.1]
-pdf = [{"Price at Expiry": f"₹{p:,.0f}", "Lot Size": lot, "Total Units": total_units, "TOTAL NET": f"₹{net_pnl:,.2f}"} for p in scenarios]
-st.table(pd.DataFrame(pdf))
+    def data_loop(self):
+        """Background loop to fetch data without freezing the GUI."""
+        ticker = yf.Ticker(self.symbol)
+        
+        while True:
+            try:
+                # 1. Fetch Spot
+                hist = ticker.history(period="1d")
+                if not hist.empty:
+                    spot = hist['Close'].iloc[-1]
+                    self.spot_val.set(round(spot, 2))
+
+                # 2. Get Nearest Expiry and Option Chain
+                expiry = ticker.options[0]
+                opt = ticker.option_chain(expiry)
+                
+                # 3. Filter by current UI Strike
+                current_strike = self.strike_price.get()
+                call_data = opt.calls[opt.calls['strike'] == current_strike]
+                put_data = opt.puts[opt.puts['strike'] == current_strike]
+
+                if not call_data.empty and not put_data.empty:
+                    c_price = call_data['lastPrice'].values[0]
+                    p_price = put_data['lastPrice'].values[0]
+                    
+                    # 4. Calculation logic (Your original features)
+                    # Formula: Synthetic = Strike + CE - PE
+                    synthetic = current_strike + c_price - p_price
+                    gap = synthetic - spot
+                    
+                    # 5. Update UI Variables
+                    self.call_val.set(c_price)
+                    self.put_val.set(p_price)
+                    self.synthetic_val.set(round(synthetic, 2))
+                    self.gap_val.set(round(gap, 2))
+                    
+                    # Update Status Color
+                    if abs(gap) > 5:
+                        self.status_label.config(text="OPPORTUNITY DETECTED", foreground="green")
+                    else:
+                        self.status_label.config(text="Market Efficient", foreground="gray")
+
+            except Exception as e:
+                print(f"Data Fetch Error: {e}")
+            
+            time.sleep(10) # Refresh rate (yfinance is rate-limited)
+
+if _name_ == "_main_":
+    root = tk.Tk()
+    app = ArbitrageApp(root)
+    root.mainloop()
