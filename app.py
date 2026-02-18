@@ -10,26 +10,11 @@ st.set_page_config(page_title="Arbitrage Monitor", layout="wide")
 st.markdown("""
     <style>
     .main { background-color: #f0f2f6; }
-    
-    /* BOLD LABELS FOR INPUTS AND METRICS */
-    label[data-testid="stWidgetLabel"] p {
-        font-weight: bold !important;
-        font-size: 16px !important;
-    }
-    
-    div[data-testid="stMetricLabel"] p { 
-        font-weight: bold !important; 
-        font-size: 16px !important; 
-    }
-    
+    label[data-testid="stWidgetLabel"] p { font-weight: bold !important; font-size: 16px !important; }
+    div[data-testid="stMetricLabel"] p { font-weight: bold !important; font-size: 16px !important; }
     div[data-testid="stMetricValue"] { font-size: 28px; color: #1f77b4; font-weight: bold; }
     .stTable { border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-    
-    .strategy-text {
-        font-weight: bold;
-        font-size: 18px;
-        margin-bottom: 5px;
-    }
+    .strategy-text { font-weight: bold; font-size: 18px; margin-bottom: 5px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -49,7 +34,7 @@ with st.sidebar:
     brokerage = st.number_input("Brokerage/Side (₹)", value=20.0)
     margin_pct = st.slider("Margin Requirement (%)", 10, 40, 20) / 100
 
-# --- 3. STABLE DATA ENGINE ---
+# --- 3. DYNAMIC DATA ENGINE ---
 @st.cache_data(ttl=30)
 def get_market_data(ticker):
     try:
@@ -58,14 +43,14 @@ def get_market_data(ticker):
         spot = hist['Close'].iloc[-1] if not hist.empty else 25725.40
         
         if stock.options:
-            expiry = stock.options[0]
+            expiry = stock.options[0] # Fetches nearest actual expiry
             chain = stock.option_chain(expiry)
-            return round(spot, 2), chain.calls, chain.puts
-        return round(spot, 2), pd.DataFrame(), pd.DataFrame()
+            return round(spot, 2), chain.calls, chain.puts, expiry
+        return round(spot, 2), pd.DataFrame(), pd.DataFrame(), "N/A"
     except:
-        return 25725.40, pd.DataFrame(), pd.DataFrame()
+        return 25725.40, pd.DataFrame(), pd.DataFrame(), "N/A"
 
-s0, calls_df, puts_df = get_market_data(ticker_map[asset])
+s0, calls_df, puts_df, current_expiry = get_market_data(ticker_map[asset])
 lot = lot_sizes[asset]
 total_units = num_lots * lot
 
@@ -75,16 +60,16 @@ with c1:
     default_strike = float(round(s0/50)*50) if "NIFTY" in asset else float(round(s0/10)*10)
     strike = st.number_input("Strike Price", value=default_strike, step=50.0 if "NIFTY" in asset else 10.0)
 
-# DYNAMIC CALL/PUT LOOKUP WITH ERROR PROTECTION
+# DYNAMIC CALL/PUT LOOKUP
 with c2:
     val_c = 0.0
     if not calls_df.empty and strike in calls_df['strike'].values:
         val_c = calls_df[calls_df['strike'] == strike]['lastPrice'].values[0]
     
-    # Fallback if price is missing or 0 to prevent UI mess
     if val_c <= 0 or np.isnan(val_c):
         val_c = round(s0 * 0.025, 2)
-    c_mkt = st.number_input("Call Price", value=float(val_c))
+    # The 'value' is now tied to val_c, making it update when strike changes
+    c_mkt = st.number_input("Call Price", value=float(val_c), key="call_input")
 
 with c3:
     val_p = 0.0
@@ -93,7 +78,8 @@ with c3:
         
     if val_p <= 0 or np.isnan(val_p):
         val_p = round(s0 * 0.018, 2)
-    p_mkt = st.number_input("Put Price", value=float(val_p))
+    # The 'value' is now tied to val_p
+    p_mkt = st.number_input("Put Price", value=float(val_p), key="put_input")
 
 # --- 4. CALCULATIONS ---
 t = days_to_expiry / 365
@@ -111,16 +97,16 @@ elif spread_per_unit < -0.1:
     signal_line, signal_color, strategy_desc = "REVERSAL ARBITRAGE DETECTED", "#dc3545", "Short Spot, Sell Put, Buy Call"
     net_pnl = (abs(spread_per_unit) * total_units) - total_friction
 else:
-    signal_line, signal_color, net_pnl, strategy_desc = "MARKET IS EFFICIENT", "#6c757d", 0, "No Action"
+    signal_line, signal_color, net_pnl, strategy_desc = "MARKET IS EFFICIENT", "#6c757d", 0.0, "No Action"
 
-# --- 5. UI DISPLAY (SIDE-BY-SIDE) ---
+# --- 5. UI DISPLAY ---
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Market Spot", f"₹{s0:,.2f}")
 m2.metric("Synthetic Price", f"₹{synthetic_spot:,.2f}")
 m3.metric("Arbitrage Gap", f"₹{abs(spread_per_unit):.2f}")
 m4.metric("Capital Req.", f"₹{capital_req:,.0f}")
 
-st.markdown(f'<div style="background-color:{signal_color}; padding:15px; border-radius:10px; text-align:center; color:white;"><h2 style="margin:0;">{signal_line}</h2></div>', unsafe_allow_html=True)
+st.markdown(f'<div style="background-color:{signal_color}; padding:15px; border-radius:10px; text-align:center; color:white;"><h2 style="margin:0;">{signal_line}</h2><p style="margin:0;">Expiry: {current_expiry}</p></div>', unsafe_allow_html=True)
 
 st.write("")
 col_proof, col_graph = st.columns([1, 1.2])
@@ -138,7 +124,7 @@ with col_graph:
     fig.update_layout(title="Risk-Neutral Payoff", height=280, margin=dict(t=30, b=0, l=0, r=0))
     st.plotly_chart(fig, use_container_width=True)
 
-# --- 6. SCENARIO TABLE (WITH LOTS) ---
+# --- 6. SCENARIO TABLE ---
 st.divider()
 st.subheader("📉 Expiry Scenario Analysis")
 scenarios = [s0 * 0.9, s0, s0 * 1.1]
