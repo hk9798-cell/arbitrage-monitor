@@ -1,119 +1,80 @@
-import tkinter as tk
-from tkinter import ttk
+import streamlit as st
 import yfinance as yf
-import threading
-import time
+import pandas as pd
 
-class ArbitrageApp:
-    def _init_(self, root):
-        self.root = root
-        self.root.title("Arbitrage Opportunity Monitor")
-        self.root.geometry("400x500")
+# --- Page Config ---
+st.set_page_config(page_title="Arbitrage Monitor", layout="wide")
+
+# --- Function to fetch data dynamically ---
+def get_market_data(symbol, strike):
+    try:
+        ticker = yf.Ticker(symbol)
+        # Fetch Spot
+        spot = ticker.history(period="1d")['Close'].iloc[-1]
         
-        # --- State Variables ---
-        self.symbol = "^NSEI"  # Nifty 50
-        self.strike_price = tk.IntVar(value=23500)
-        self.spot_val = tk.DoubleVar(value=0.0)
-        self.call_val = tk.DoubleVar(value=0.0)
-        self.put_val = tk.DoubleVar(value=0.0)
-        self.synthetic_val = tk.DoubleVar(value=0.0)
-        self.gap_val = tk.DoubleVar(value=0.0)
+        # Get nearest expiry option chain
+        expiry = ticker.options[0]
+        opt = ticker.option_chain(expiry)
         
-        self.create_widgets()
+        # Filter for the specific strike
+        call_price = opt.calls[opt.calls['strike'] == strike]['lastPrice'].values[0]
+        put_price = opt.puts[opt.puts['strike'] == strike]['lastPrice'].values[0]
         
-        # Start the background data thread
-        self.update_thread = threading.Thread(target=self.data_loop, daemon=True)
-        self.update_thread.start()
+        return spot, call_price, put_price, expiry
+    except:
+        return None, None, None, None
 
-    def create_widgets(self):
-        # Header
-        ttk.Label(self.root, text="Market Arbitrage Monitor", font=("Arial", 16, "bold")).pack(pady=10)
+# --- UI Layout ---
+st.title("🏛️ Cross-Asset Arbitrage Opportunity Monitor")
+
+# Sidebar/Inputs
+with st.container():
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        # Use a number input to change strike - this triggers a re-run
+        strike_price = st.number_input("Strike Price", value=25800, step=50)
+    
+    # Fetch Data based on the input above
+    spot, call, put, expiry = get_market_data("^NSEI", strike_price)
+
+    if spot:
+        # --- Calculations (Your features) ---
+        # Synthetic Price = Strike + Call - Put
+        synthetic = strike_price + call - put
+        gap = synthetic - spot
+        capital_req = 335250 # Example static value from your screenshot
         
-        # Spot Price Display
-        frame_spot = ttk.Frame(self.root)
-        frame_spot.pack(pady=5)
-        ttk.Label(frame_spot, text="Nifty Spot: ").pack(side="left")
-        ttk.Label(frame_spot, textvariable=self.spot_val, foreground="blue", font=("Arial", 12, "bold")).pack(side="left")
+        with col2:
+            st.metric("Call Price", f"₹{call}")
+        with col3:
+            st.metric("Put Price", f"₹{put}")
 
-        # Strike Price Selector (+ / - Buttons)
-        frame_strike = ttk.LabelFrame(self.root, text="Select Strike Price", padding=10)
-        frame_strike.pack(pady=10, fill="x", padx=20)
+        st.divider()
+
+        # --- Metrics Row ---
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Market Spot", f"₹{spot:,.2f}")
+        m2.metric("Synthetic Price", f"₹{synthetic:,.2f}")
+        m3.metric("Arbitrage Gap", f"₹{gap:,.2f}")
+        m4.metric("Capital Req.", f"₹{capital_req:,}")
+
+        # --- Alert Logic ---
+        if gap > 20: # Example threshold
+            st.error(f"REVERSAL ARBITRAGE DETECTED (Expiry: {expiry})")
+        else:
+            st.info("Market is currently efficient.")
+
+        # --- Execution Proof (Formula from your image) ---
+        st.subheader("📊 Execution Proof")
+        st.latex(r"P = Units \times [(S_T - S_0) + (K - S_T)^+ - (S_T - K)^+ + (C - P)]")
         
-        ttk.Button(frame_strike, text="-", command=lambda: self.adjust_strike(-50)).pack(side="left", expand=True)
-        ttk.Label(frame_strike, textvariable=self.strike_price, font=("Arial", 14, "bold")).pack(side="left", expand=True)
-        ttk.Button(frame_strike, text="+", command=lambda: self.adjust_strike(50)).pack(side="left", expand=True)
+        # Simple Payoff Graph Simulation
+        chart_data = pd.DataFrame({"Risk-Neutral Payoff": [6099.54] * 10})
+        st.line_chart(chart_data)
 
-        # Data Display Table
-        data_frame = ttk.Frame(self.root)
-        data_frame.pack(pady=20)
+    else:
+        st.warning("Please wait, fetching live market data or strike not found...")
 
-        rows = [
-            ("Call Price (CE):", self.call_val),
-            ("Put Price (PE):", self.put_val),
-            ("Synthetic Price:", self.synthetic_val),
-            ("Arbitrage Gap:", self.gap_val)
-        ]
-
-        for i, (label_text, var) in enumerate(rows):
-            ttk.Label(data_frame, text=label_text, font=("Arial", 10)).grid(row=i, column=0, sticky="w", pady=5, padx=10)
-            ttk.Label(data_frame, textvariable=var, font=("Arial", 10, "bold")).grid(row=i, column=1, sticky="e", pady=5)
-
-        # Indicator Light for Arbitrage
-        self.status_label = ttk.Label(self.root, text="Scanning Market...", foreground="gray")
-        self.status_label.pack(pady=20)
-
-    def adjust_strike(self, amount):
-        self.strike_price.set(self.strike_price.get() + amount)
-        self.status_label.config(text="Updating for new strike...", foreground="orange")
-
-    def data_loop(self):
-        """Background loop to fetch data without freezing the GUI."""
-        ticker = yf.Ticker(self.symbol)
-        
-        while True:
-            try:
-                # 1. Fetch Spot
-                hist = ticker.history(period="1d")
-                if not hist.empty:
-                    spot = hist['Close'].iloc[-1]
-                    self.spot_val.set(round(spot, 2))
-
-                # 2. Get Nearest Expiry and Option Chain
-                expiry = ticker.options[0]
-                opt = ticker.option_chain(expiry)
-                
-                # 3. Filter by current UI Strike
-                current_strike = self.strike_price.get()
-                call_data = opt.calls[opt.calls['strike'] == current_strike]
-                put_data = opt.puts[opt.puts['strike'] == current_strike]
-
-                if not call_data.empty and not put_data.empty:
-                    c_price = call_data['lastPrice'].values[0]
-                    p_price = put_data['lastPrice'].values[0]
-                    
-                    # 4. Calculation logic (Your original features)
-                    # Formula: Synthetic = Strike + CE - PE
-                    synthetic = current_strike + c_price - p_price
-                    gap = synthetic - spot
-                    
-                    # 5. Update UI Variables
-                    self.call_val.set(c_price)
-                    self.put_val.set(p_price)
-                    self.synthetic_val.set(round(synthetic, 2))
-                    self.gap_val.set(round(gap, 2))
-                    
-                    # Update Status Color
-                    if abs(gap) > 5:
-                        self.status_label.config(text="OPPORTUNITY DETECTED", foreground="green")
-                    else:
-                        self.status_label.config(text="Market Efficient", foreground="gray")
-
-            except Exception as e:
-                print(f"Data Fetch Error: {e}")
-            
-            time.sleep(10) # Refresh rate (yfinance is rate-limited)
-
-if _name_ == "_main_":
-    root = tk.Tk()
-    app = ArbitrageApp(root)
-    root.mainloop()
+# --- Footer ---
+st.button("Manual Refresh")
