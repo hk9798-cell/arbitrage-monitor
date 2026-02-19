@@ -268,7 +268,7 @@ ticker_html += '<span style="margin-left:auto;font-size:11px;color:#475569;">Upd
 st.markdown(ticker_html, unsafe_allow_html=True)
 
 # ── CONSTANTS ─────────────────────────────────────────────────────────────────
-LOT_SIZES      = {"NIFTY": 65,   "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
+LOT_SIZES      = {"NIFTY": 50,   "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
 STRIKE_STEP    = {"NIFTY": 50,   "RELIANCE": 20,  "TCS": 50,  "SBIN": 5,    "INFY": 20}
 FALLBACK_SPOTS = {"NIFTY": 25800.0, "RELIANCE": 1420.0, "TCS": 3850.0, "SBIN": 810.0, "INFY": 1580.0}
 TICKER_MAP     = {"NIFTY": "^NSEI", "RELIANCE": "RELIANCE.NS", "TCS": "TCS.NS", "SBIN": "SBIN.NS", "INFY": "INFY.NS"}
