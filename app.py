@@ -159,10 +159,11 @@ with st.spinner(""):
     ticker_data = get_ticker_bar_data()
 
 now_str = datetime.datetime.now().strftime("%H:%M:%S")
-ticker_html = '''<div style="background:linear-gradient(90deg,#1f77b4,#2c95d6);
-    border-radius:10px; padding:10px 20px;
-    margin-bottom:16px; display:flex; gap:0; flex-wrap:wrap; align-items:center;">
-    <span style="font-size:11px;color:#ffffff;font-weight:800;
+ticker_html = '''<div style="background:#ffffff;
+    border:2px solid #1f77b4; border-radius:10px; padding:10px 20px;
+    margin-bottom:16px; display:flex; gap:0; flex-wrap:wrap; align-items:center;
+    box-shadow: 0 2px 8px rgba(31,119,180,0.15);">
+    <span style="font-size:11px;color:#1f77b4;font-weight:800;
           margin-right:20px;letter-spacing:0.1em;">● LIVE MARKET</span>'''
 
 for asset_name, d in ticker_data.items():
@@ -170,17 +171,17 @@ for asset_name, d in ticker_data.items():
     arrow  = "▲" if d["chg"] >= 0 else "▼"
     prefix = "₹" if asset_name != "USD/INR" else ""
     ticker_html += (
-        '<span style="font-size:13px;font-weight:700;color:#ffffff;'
+        '<span style="font-size:13px;font-weight:700;color:#212529;'
         'margin-right:24px;display:inline-flex;align-items:center;gap:5px;">'
-        '<span style="color:#cce5ff;font-size:11px;font-weight:800;">{n}</span>'
+        '<span style="color:#1f77b4;font-size:12px;font-weight:800;">{n}&nbsp;</span>'
         '{p}{v:,.2f}'
-        '<span style="color:{c};font-size:11px;">{a} {p2}{chg:.2f} ({pct:.2f}%)</span>'
+        '<span style="color:{c};font-size:12px;font-weight:600;">&nbsp;{a} {p2}{chg:.2f} ({pct:.2f}%)</span>'
         '</span>'.format(
             n=asset_name, p=prefix, v=d["price"],
             c=color, a=arrow, p2=prefix, chg=abs(d["chg"]), pct=abs(d["chg_pct"]))
     )
 
-ticker_html += '<span style="margin-left:auto;font-size:11px;color:#cce5ff;">Updated: {t}</span></div>'.format(t=now_str)
+ticker_html += '<span style="margin-left:auto;font-size:11px;color:#6c757d;">Updated: {t}</span></div>'.format(t=now_str)
 st.markdown(ticker_html, unsafe_allow_html=True)
 
 
@@ -951,41 +952,6 @@ with tab1:
                   delta_color="normal" if pnl_profitable else "inverse")
         st.caption("Across {:,} units ({} lot{} × {})".format(
             total_units, num_lots, "s" if num_lots > 1 else "", lot))
-        # ── FEATURE 10: EXECUTION TIMELINE ───────────────────────────────────
-        if signal_type != "none":
-            st.markdown("**⏱️ Trade Execution Timeline:**")
-            mid_day = max(days_to_expiry // 2, 1)
-            tl_x = [0, mid_day, days_to_expiry]
-            tl_labels = ["Day 0\nOpen Position", "Day {}\nMonitor".format(mid_day),
-                         "Day {}\nClose / Expiry".format(days_to_expiry)]
-            tl_y = [1, 1, 1]
-            fig_tl = go.Figure()
-            fig_tl.add_trace(go.Scatter(
-                x=tl_x, y=tl_y, mode="lines+markers+text",
-                line=dict(color="#f59e0b", width=3),
-                marker=dict(size=[16,10,16],
-                            color=["#22c55e","#f59e0b","#3b82f6"],
-                            symbol=["circle","circle","star"],
-                            line=dict(color="#112240", width=2)),
-                text=tl_labels, textposition="bottom center",
-                textfont=dict(size=10, color="#e2e8f0")))
-            # Profit annotation at end
-            fig_tl.add_annotation(
-                x=days_to_expiry, y=1.15,
-                text="<b>Net ₹{:,.0f}</b>".format(net_pnl),
-                font=dict(size=13, color="#22c55e" if pnl_profitable else "#ef4444"),
-                showarrow=False, bgcolor="#0d1b3e",
-                bordercolor="#22c55e" if pnl_profitable else "#ef4444",
-                borderwidth=1, borderpad=4)
-            fig_tl.update_layout(
-                height=150, margin=dict(t=20,b=50,l=20,r=20),
-                xaxis=dict(title="Days", range=[-2, days_to_expiry+5],
-                           showgrid=False, color="#94a3b8"),
-                yaxis=dict(visible=False, range=[0.5, 1.5]),
-                plot_bgcolor="#f8f9fa", paper_bgcolor="white",
-                font=dict(color="#333333"), showlegend=False)
-            st.plotly_chart(fig_tl, use_container_width=True)
-
 
 
     with col_graph:
@@ -1055,82 +1021,6 @@ with tab1:
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
     st.info("**Gross P&L = ₹{:,.2f}** (gap × units).  **Net P&L = ₹{:,.2f}** (Gross − Friction). "
             "Identical in every row — the arbitrage is locked at inception.".format(gross_spread, net_pnl))
-    # ── FEATURE 3: HISTORICAL GAP CHART ─────────────────────────────────────
-    st.divider()
-    with st.expander("📈 Historical Arbitrage Gap Analysis (last 30 days)", expanded=False):
-        @st.cache_data(ttl=3600, show_spinner=False)
-        def get_hist_gap(asset_n, k, r, t_days):
-            try:
-                ticker_h = TICKER_MAP[asset_n]
-                hist = yf.Ticker(ticker_h).history(period="35d")["Close"].dropna()
-                if len(hist) < 5:
-                    return pd.DataFrame()
-                dates, gaps, synths = [], [], []
-                for i, (date, spot_h) in enumerate(hist.items()):
-                    days_left = max(t_days - i, 1)
-                    T_h       = days_left / 365.0
-                    pv_k_h    = k * np.exp(-r * T_h)
-                    # Use fixed option prices as proxy (ATM approx from BSM 20% vol)
-                    import math
-                    sigma_h = 0.20
-                    if T_h > 0:
-                        d1h = (math.log(spot_h/k) + (r + 0.5*sigma_h**2)*T_h) / (sigma_h*math.sqrt(T_h))
-                        d2h = d1h - sigma_h*math.sqrt(T_h)
-                        try:
-                            from scipy.stats import norm as _n
-                            c_h = spot_h*_n.cdf(d1h) - k*math.exp(-r*T_h)*_n.cdf(d2h)
-                            p_h = k*math.exp(-r*T_h)*_n.cdf(-d2h) - spot_h*_n.cdf(-d1h)
-                        except Exception:
-                            c_h = spot_h * 0.025; p_h = spot_h * 0.018
-                    else:
-                        c_h = max(spot_h - k, 0); p_h = max(k - spot_h, 0)
-                    synth_h = c_h - p_h + pv_k_h
-                    gap_h   = spot_h - synth_h
-                    dates.append(date); gaps.append(gap_h); synths.append(synth_h)
-                df_hist = pd.DataFrame({"Date": dates, "Spot": hist.values[:len(dates)],
-                                        "Synthetic": synths, "Gap": gaps})
-                return df_hist
-            except Exception:
-                return pd.DataFrame()
-
-        df_gap = get_hist_gap(asset, strike, r_rate, days_to_expiry)
-        if df_gap.empty:
-            st.info("Historical data unavailable. Live spot required.")
-        else:
-            fig_hist = go.Figure()
-            colors_gap = ["#22c55e" if g > 0 else "#ef4444" for g in df_gap["Gap"]]
-            fig_hist.add_trace(go.Bar(
-                x=df_gap["Date"], y=df_gap["Gap"],
-                name="Arbitrage Gap (Spot − Synthetic)",
-                marker_color=colors_gap, opacity=0.8))
-            fig_hist.add_hline(y=0, line_dash="dash", line_color="#94a3b8", line_width=1)
-            fig_hist.add_hline(y=s0 * (arb_threshold_pct/100),
-                               line_dash="dot", line_color="#f59e0b", line_width=1.5,
-                               annotation_text="Long threshold", annotation_font_color="#f59e0b")
-            fig_hist.add_hline(y=-s0 * (arb_threshold_pct/100),
-                               line_dash="dot", line_color="#f59e0b", line_width=1.5,
-                               annotation_text="Short threshold", annotation_font_color="#f59e0b")
-            fig_hist.update_layout(
-                title="30-Day Historical PCP Gap — {} (BSM-estimated options)".format(asset),
-                xaxis=dict(title="Date", showgrid=False),
-                yaxis=dict(title="Gap per unit (₹)", tickformat=",.2f",
-                           gridcolor="#e9ecef"),
-                height=300, margin=dict(t=40,b=30,l=10,r=10),
-                plot_bgcolor="#f8f9fa", paper_bgcolor="white",
-                font=dict(color="#333333"), showlegend=False)
-            st.plotly_chart(fig_hist, use_container_width=True)
-
-            avg_gap = df_gap["Gap"].mean()
-            pos_days = (df_gap["Gap"] > s0*(arb_threshold_pct/100)).sum()
-            neg_days = (df_gap["Gap"] < -s0*(arb_threshold_pct/100)).sum()
-            hg1, hg2, hg3, hg4 = st.columns(4)
-            hg1.metric("Avg Gap (30d)",       "₹{:.2f}".format(avg_gap))
-            hg2.metric("Conversion Days",     "{}/{}".format(pos_days, len(df_gap)))
-            hg3.metric("Reversal Days",       "{}/{}".format(neg_days, len(df_gap)))
-            hg4.metric("Today's Gap",         "₹{:.2f}".format(spread_per_unit))
-            st.caption("⚠️ Historical gaps computed using BSM-estimated theoretical option prices at 20% implied vol. "
-                       "Actual market gaps would differ based on real option premiums.")
-
 
 
     # ── GREEKS PANEL ──────────────────────────────────────────────────────────
@@ -1198,92 +1088,6 @@ with tab1:
             st.plotly_chart(fg, use_container_width=True)
             st.info("A perfect PCP arbitrage has Delta≈0, Gamma≈0, Vega≈0. Residual Theta and Rho "
                     "confirm the position is locked but sensitive to time decay and rate changes.")
-    # ── FEATURE 8: SENSITIVITY ANALYSIS ─────────────────────────────────────
-    st.divider()
-    with st.expander("🎯 Sensitivity Analysis — How P&L Changes with Rate & Volatility", expanded=False):
-        sa1, sa2 = st.columns(2)
-        with sa1:
-            st.markdown("##### Net P&L vs Risk-Free Rate")
-            r_range   = np.linspace(0.04, 0.10, 25)
-            pnl_r     = []
-            for r_test in r_range:
-                pv_k_t   = strike * np.exp(-r_test * t)
-                synth_t  = c_mkt - p_mkt + pv_k_t
-                gap_t    = s0 - synth_t
-                gross_t  = abs(gap_t) * total_units
-                net_t    = gross_t - total_friction
-                pnl_r.append(net_t)
-            fig_sa1 = go.Figure()
-            fig_sa1.add_trace(go.Scatter(
-                x=r_range * 100, y=pnl_r, mode="lines+markers",
-                line=dict(color="#f59e0b", width=2.5),
-                marker=dict(size=5, color="#f59e0b"),
-                fill="tozeroy", fillcolor="rgba(245,158,11,0.12)"))
-            fig_sa1.add_vline(x=r_rate*100, line_dash="dash", line_color="#22c55e",
-                              annotation_text="Current {:.2f}%".format(r_rate*100),
-                              annotation_font_color="#22c55e")
-            fig_sa1.add_hline(y=0, line_dash="dash", line_color="#ef4444", line_width=1)
-            fig_sa1.update_layout(
-                xaxis=dict(title="Risk-Free Rate (%)", gridcolor="#e9ecef"),
-                yaxis=dict(title="Net P&L (₹)", tickformat=",.0f", gridcolor="#e9ecef"),
-                height=260, margin=dict(t=20,b=30,l=10,r=10),
-                plot_bgcolor="#f8f9fa", paper_bgcolor="white",
-                font=dict(color="#333333"), showlegend=False)
-            st.plotly_chart(fig_sa1, use_container_width=True)
-
-        with sa2:
-            st.markdown("##### Net P&L vs Call–Put Spread (Option Price Sensitivity)")
-            spread_range = np.linspace(-50, 50, 25)   # ₹ change in C−P spread
-            pnl_cp = []
-            for delta_cp in spread_range:
-                c_test   = c_mkt + delta_cp / 2
-                p_test   = p_mkt - delta_cp / 2
-                synth_t  = c_test - p_test + pv_k
-                gap_t    = s0 - synth_t
-                gross_t  = abs(gap_t) * total_units
-                fric_t   = brokerage * (fno_orders+2) + stt_spot + (c_test+p_test)*total_units*0.000625
-                net_t    = gross_t - fric_t
-                pnl_cp.append(net_t)
-            fig_sa2 = go.Figure()
-            fig_sa2.add_trace(go.Scatter(
-                x=spread_range, y=pnl_cp, mode="lines+markers",
-                line=dict(color="#3b82f6", width=2.5),
-                marker=dict(size=5, color="#3b82f6"),
-                fill="tozeroy", fillcolor="rgba(59,130,246,0.12)"))
-            fig_sa2.add_vline(x=0, line_dash="dash", line_color="#22c55e",
-                              annotation_text="Current", annotation_font_color="#22c55e")
-            fig_sa2.add_hline(y=0, line_dash="dash", line_color="#ef4444", line_width=1)
-            fig_sa2.update_layout(
-                xaxis=dict(title="Change in (C − P) spread (₹)", gridcolor="#e9ecef"),
-                yaxis=dict(title="Net P&L (₹)", tickformat=",.0f", gridcolor="#e9ecef"),
-                height=260, margin=dict(t=20,b=30,l=10,r=10),
-                plot_bgcolor="#f8f9fa", paper_bgcolor="white",
-                font=dict(color="#333333"), showlegend=False)
-            st.plotly_chart(fig_sa2, use_container_width=True)
-
-        # Transaction cost breakdown pie chart
-        st.markdown("##### 🥧 Transaction Cost Breakdown")
-        pie_labels = ["Brokerage", "STT on Spot", "STT on Options"]
-        pie_values = [total_brokerage, stt_spot, stt_options]
-        fig_pie = go.Figure(go.Pie(
-            labels=pie_labels, values=pie_values,
-            hole=0.5,
-            marker=dict(colors=["#f59e0b", "#3b82f6", "#8b5cf6"],
-                        line=dict(color="#112240", width=2)),
-            textinfo="label+percent",
-            textfont=dict(color="#e2e8f0", size=13)))
-        fig_pie.update_layout(
-            height=260, margin=dict(t=20,b=10,l=10,r=10),
-            plot_bgcolor="#f8f9fa", paper_bgcolor="white",
-            font=dict(color="#333333"),
-            annotations=[dict(text="₹{:,.0f}".format(total_friction),
-                              x=0.5, y=0.5, font_size=16, font_color="#f59e0b",
-                              showarrow=False)])
-        st.plotly_chart(fig_pie, use_container_width=True)
-        st.caption("Sensitivity analysis shows how robust your arbitrage is. "
-                   "If Net P&L stays positive across a wide range of rate changes, "
-                   "the opportunity is genuine and not rate-dependent.")
-
 
 
 # ══════════════════════════════════════════════════════════════════════════════
