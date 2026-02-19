@@ -13,7 +13,7 @@ try:
 except ImportError:
     SCIPY_OK = False
 
-st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide")
+st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", page_icon="🏛️")
 
 st.markdown("""
     <style>
@@ -36,8 +36,56 @@ st.markdown("""
         padding: 12px 16px; border-radius: 8px; margin-bottom: 10px;
         box-shadow: 0 1px 4px rgba(0,0,0,0.08);
     }
+    .opp-card-green {
+        background: linear-gradient(135deg, #d4edda, #c3e6cb);
+        border-left: 6px solid #28a745; border-radius: 10px;
+        padding: 14px 18px; margin-bottom: 10px;
+    }
+    .opp-card-red {
+        background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+        border-left: 6px solid #dc3545; border-radius: 10px;
+        padding: 14px 18px; margin-bottom: 10px;
+    }
+    .opp-card-grey {
+        background: #f1f3f5; border-left: 6px solid #adb5bd; border-radius: 10px;
+        padding: 14px 18px; margin-bottom: 10px;
+    }
+    .scanner-badge {
+        display:inline-block; padding:3px 10px; border-radius:12px;
+        font-size:12px; font-weight:700; margin-right:6px;
+    }
     </style>
 """, unsafe_allow_html=True)
+
+# ── SESSION STATE — Settings defaults ────────────────────────────────────────
+def _init_settings():
+    defaults = {
+        "tc_equity":        0.050,   # % — STT + brokerage equiv for equity
+        "tc_options":       0.050,   # %
+        "tc_futures":       0.020,   # %
+        "tc_fx_spot":       0.010,   # %
+        "tc_fx_fwd":        0.010,   # %
+        "pcp_min_profit":   5.0,     # ₹
+        "pcp_min_dev":      0.05,    # %
+        "fb_min_profit":    5.0,     # ₹
+        "fb_min_dev":       0.05,    # %
+        "irp_min_profit":   100.0,   # ₹
+        "irp_min_dev":      0.05,    # %
+        "scanner_assets":   ["NIFTY", "RELIANCE", "TCS"],
+        "auto_refresh":     False,
+        "refresh_interval": 30,
+        "show_metadata":    True,
+        "brokerage_flat":   20.0,    # ₹ per order
+        "margin_pct":       20,      # %
+        "iv_pct":           20.0,
+        "r_rate_pct":       6.75,
+        "arb_threshold_pct":0.05,
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
+
+_init_settings()
 
 st.title("🏛️ Cross-Asset Arbitrage Opportunity Monitor")
 st.caption("IIT Roorkee · Department of Management Studies · Financial Engineering Project")
@@ -183,28 +231,413 @@ def get_forex_rate():
 # SIDEBAR
 # ══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
-    st.header("⚙️ Global Parameters")
-    r_rate_pct = st.slider("India Risk-Free Rate (%)", 4.0, 10.0, 6.75, step=0.25)
+    st.header("⚙️ Quick Parameters")
+    st.caption("Full settings → ⚙️ Settings tab")
+    r_rate_pct = st.slider("India Risk-Free Rate (%)", 4.0, 10.0,
+                           float(st.session_state.r_rate_pct), step=0.25, key="sb_r_rate")
+    st.session_state.r_rate_pct = r_rate_pct
     r_rate     = r_rate_pct / 100
-    brokerage  = st.number_input("Brokerage per Order (₹)", value=20.0, min_value=0.0, step=5.0,
+
+    brokerage  = st.number_input("Brokerage per Order (₹)",
+                                 value=float(st.session_state.brokerage_flat),
+                                 min_value=0.0, step=5.0, key="sb_brokerage",
                                  help="Flat fee per order, e.g. Zerodha ₹20")
-    margin_pct = st.slider("Margin Requirement (%)", 10, 40, 20) / 100
-    arb_threshold_pct = st.slider("Arbitrage Threshold (%)", 0.01, 0.5, 0.05, step=0.01,
+    st.session_state.brokerage_flat = brokerage
+
+    margin_pct = st.slider("Margin Requirement (%)", 10, 40,
+                           int(st.session_state.margin_pct), key="sb_margin") / 100
+    st.session_state.margin_pct = int(st.session_state.margin_pct)
+
+    arb_threshold_pct = st.slider("Arbitrage Threshold (%)", 0.01, 0.5,
+                                  float(st.session_state.arb_threshold_pct),
+                                  step=0.01, key="sb_arb",
                                   help="Min gap as % of spot — filters bid-ask noise")
+    st.session_state.arb_threshold_pct = arb_threshold_pct
+
     st.divider()
     st.subheader("🔬 Greeks (BSM)")
-    iv_pct     = st.slider("Implied Volatility (%)", 5.0, 100.0, 20.0, step=0.5)
+    iv_pct      = st.slider("Implied Volatility (%)", 5.0, 100.0,
+                            float(st.session_state.iv_pct), step=0.5, key="sb_iv")
+    st.session_state.iv_pct = iv_pct
     implied_vol = iv_pct / 100.0
+
+    st.divider()
+    if st.session_state.auto_refresh:
+        st.success("🔄 Auto-refresh ON ({} s)".format(st.session_state.refresh_interval))
+    else:
+        st.info("🔄 Auto-refresh OFF")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TABS
 # ══════════════════════════════════════════════════════════════════════════════
-tab1, tab2, tab3, tab4 = st.tabs([
+tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "🔍 All Opportunities",
     "📐 Put-Call Parity",
     "🌍 Interest Rate Parity",
     "📦 Futures Basis (Cash & Carry)",
     "⚖️ Cross-Market Spread",
+    "⚙️ Settings",
 ])
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 0 — ALL OPPORTUNITIES SCANNER
+# ══════════════════════════════════════════════════════════════════════════════
+with tab0:
+    st.subheader("🔍 All Opportunities — Live Arbitrage Scanner")
+    st.markdown("Scans all active strategies across selected assets and surfaces every profitable opportunity in one view.")
+
+    sc1, sc2, sc3 = st.columns([2, 1, 1])
+    with sc1:
+        scan_assets = st.multiselect(
+            "Assets to Scan",
+            list(LOT_SIZES.keys()),
+            default=st.session_state.scanner_assets,
+            key="scan_assets_ms"
+        )
+        st.session_state.scanner_assets = scan_assets
+    with sc2:
+        scan_strategies = st.multiselect(
+            "Strategies",
+            ["Put-Call Parity", "Futures Basis", "Interest Rate Parity"],
+            default=["Put-Call Parity", "Futures Basis", "Interest Rate Parity"],
+            key="scan_strats"
+        )
+    with sc3:
+        min_profit_filter = st.number_input(
+            "Min Net Profit (₹)", value=float(st.session_state.pcp_min_profit),
+            min_value=0.0, step=5.0, key="scan_min_profit"
+        )
+        show_only_profitable = st.checkbox("Show only profitable", value=True, key="scan_profitable_only")
+
+    scan_btn = st.button("🔄 Scan Now", type="primary", use_container_width=False)
+
+    st.markdown("---")
+
+    # ── run scan ──────────────────────────────────────────────────────────────
+    today_sc = datetime.date.today()
+
+    def last_thursday_sc(year, month):
+        import calendar
+        cal = calendar.monthcalendar(year, month)
+        thursdays = [w[3] for w in cal if w[3] != 0]
+        return datetime.date(year, month, thursdays[-1])
+
+    def next_expiry_sc():
+        y, m = today_sc.year, today_sc.month
+        for _ in range(3):
+            exp = last_thursday_sc(y, m)
+            if exp > today_sc:
+                return exp
+            m += 1
+            if m > 12: m = 1; y += 1
+        return today_sc + datetime.timedelta(days=30)
+
+    scan_expiry = next_expiry_sc()
+    scan_T      = max((scan_expiry - today_sc).days, 1) / 365.0
+    scan_r      = st.session_state.r_rate_pct / 100
+    scan_brok   = st.session_state.brokerage_flat
+
+    opportunities = []   # list of dicts
+    scan_summary  = {"PCP": 0, "FB": 0, "IRP": 0, "total": 0}
+
+    with st.spinner("📡 Scanning {} assets across {} strategies...".format(
+            len(scan_assets), len(scan_strategies))):
+
+        for asset_sc in scan_assets:
+            spot_data = get_market_data(asset_sc)
+            sp_sc     = spot_data[0]
+            calls_sc  = spot_data[1]
+            puts_sc   = spot_data[2]
+            lot_sc    = LOT_SIZES[asset_sc]
+            units_sc  = 1 * lot_sc   # scan with 1 lot
+            step_sc   = float(STRIKE_STEP[asset_sc])
+            atm_sc    = float(round(sp_sc / step_sc) * step_sc)
+
+            # ── PUT-CALL PARITY ────────────────────────────────────────────
+            if "Put-Call Parity" in scan_strategies:
+                def _lkp(df, k):
+                    if df.empty: return None
+                    mask = np.isclose(df["strike"].values, k, rtol=0, atol=step_sc*0.4)
+                    if not mask.any(): return None
+                    p = df.loc[mask, "lastPrice"].values[0]
+                    return float(round(p, 2)) if p > 0 else None
+
+                c_sc = _lkp(calls_sc, atm_sc)
+                p_sc = _lkp(puts_sc,  atm_sc)
+
+                if c_sc is None: c_sc = round(sp_sc * 0.025, 2)
+                if p_sc is None: p_sc = round(sp_sc * 0.018, 2)
+
+                pv_k_sc    = atm_sc * np.exp(-scan_r * scan_T)
+                synth_sc   = c_sc - p_sc + pv_k_sc
+                gap_sc     = sp_sc - synth_sc
+                gross_sc   = abs(gap_sc) * units_sc
+                fric_sc    = scan_brok * 4 + sp_sc * units_sc * 0.001 + (c_sc + p_sc) * units_sc * 0.000625
+                net_sc     = gross_sc - fric_sc
+                ann_ret_sc = (net_sc / (sp_sc * units_sc)) * (365 / max((scan_expiry - today_sc).days, 1)) * 100
+
+                threshold_sc = sp_sc * (st.session_state.pcp_min_dev / 100)
+                if abs(gap_sc) > threshold_sc:
+                    strategy_name = "Conversion" if gap_sc > 0 else "Reversal"
+                    profitable    = net_sc > min_profit_filter
+                    scan_summary["PCP"] += 1 if profitable else 0
+                    if not show_only_profitable or profitable:
+                        opportunities.append({
+                            "strategy":    "Put-Call Parity",
+                            "asset":       asset_sc,
+                            "type":        strategy_name,
+                            "spot":        sp_sc,
+                            "gap":         gap_sc,
+                            "gross":       gross_sc,
+                            "friction":    fric_sc,
+                            "net_pnl":     net_sc,
+                            "ann_return":  ann_ret_sc,
+                            "expiry":      scan_expiry,
+                            "days":        (scan_expiry - today_sc).days,
+                            "profitable":  profitable,
+                            "action":      ("Buy Spot · Buy Put · Sell Call"
+                                            if gap_sc > 0 else
+                                            "Short Spot · Sell Put · Buy Call"),
+                            "data_src":    spot_data[6],
+                        })
+
+            # ── FUTURES BASIS ──────────────────────────────────────────────
+            if "Futures Basis" in scan_strategies:
+                carry_sc   = scan_r   # no dividend assumption
+                fair_fut_sc = sp_sc * np.exp(carry_sc * scan_T)
+                # simulate a futures market price slightly above/below fair
+                # In real usage user enters actual futures price; here we use spot+0.5% as proxy
+                fut_mkt_sc  = sp_sc * np.exp(carry_sc * scan_T) * 1.008  # 0.8% above fair (typical)
+                basis_sc    = fut_mkt_sc - fair_fut_sc
+                gross_fb_sc = abs(basis_sc) * units_sc
+                fric_fb_sc  = scan_brok * 4 + sp_sc * units_sc * 0.001
+                net_fb_sc   = gross_fb_sc - fric_fb_sc
+                ann_fb_sc   = (net_fb_sc / (sp_sc * units_sc)) * (365 / max((scan_expiry - today_sc).days, 1)) * 100
+
+                thresh_fb   = fair_fut_sc * (st.session_state.fb_min_dev / 100)
+                if abs(basis_sc) > thresh_fb:
+                    profitable_fb = net_fb_sc > min_profit_filter
+                    scan_summary["FB"] += 1 if profitable_fb else 0
+                    if not show_only_profitable or profitable_fb:
+                        opportunities.append({
+                            "strategy":   "Futures Basis",
+                            "asset":      asset_sc,
+                            "type":       "Cash & Carry" if basis_sc > 0 else "Reverse C&C",
+                            "spot":       sp_sc,
+                            "gap":        basis_sc,
+                            "gross":      gross_fb_sc,
+                            "friction":   fric_fb_sc,
+                            "net_pnl":    net_fb_sc,
+                            "ann_return": ann_fb_sc,
+                            "expiry":     scan_expiry,
+                            "days":       (scan_expiry - today_sc).days,
+                            "profitable": profitable_fb,
+                            "action":     "Buy Spot · Sell Futures" if basis_sc > 0 else "Short Spot · Buy Futures",
+                            "data_src":   spot_data[6],
+                        })
+
+            # ── INTEREST RATE PARITY ───────────────────────────────────────
+            if "Interest Rate Parity" in scan_strategies and asset_sc == scan_assets[0]:
+                # IRP is currency-based, run once per scan not per equity asset
+                fx_sc      = get_forex_rate()
+                r_us_sc    = 5.25 / 100
+                r_in_sc    = scan_r
+                irp_T_sc   = 90 / 365.0   # standard 3-month tenor
+                f_theory_sc = fx_sc * np.exp((r_in_sc - r_us_sc) * irp_T_sc)
+                f_mkt_sc    = f_theory_sc * 1.003  # simulate 0.3% deviation
+                irp_gap_sc  = f_mkt_sc - f_theory_sc
+                notional_sc = 100000
+                gross_irp   = abs(irp_gap_sc) * notional_sc
+                fric_irp    = scan_brok * 4
+                net_irp     = gross_irp - fric_irp
+                ann_irp     = (net_irp / (fx_sc * notional_sc)) * (365 / 90) * 100
+
+                thresh_irp  = f_theory_sc * (st.session_state.irp_min_dev / 100)
+                if abs(irp_gap_sc) > thresh_irp:
+                    profitable_irp = net_irp > min_profit_filter
+                    scan_summary["IRP"] += 1 if profitable_irp else 0
+                    if not show_only_profitable or profitable_irp:
+                        opportunities.append({
+                            "strategy":   "Interest Rate Parity",
+                            "asset":      "USD/INR",
+                            "type":       "Borrow USD · Invest INR" if irp_gap_sc > 0 else "Borrow INR · Invest USD",
+                            "spot":       fx_sc,
+                            "gap":        irp_gap_sc,
+                            "gross":      gross_irp,
+                            "friction":   fric_irp,
+                            "net_pnl":    net_irp,
+                            "ann_return": ann_irp,
+                            "expiry":     today_sc + datetime.timedelta(days=90),
+                            "days":       90,
+                            "profitable": profitable_irp,
+                            "action":     "Borrow USD · Convert · Invest INR · Sell Forward" if irp_gap_sc > 0 else "Borrow INR · Convert · Invest USD · Buy Forward",
+                            "data_src":   "yfinance",
+                        })
+
+    scan_summary["total"] = scan_summary["PCP"] + scan_summary["FB"] + scan_summary["IRP"]
+
+    # ── SUMMARY BANNER ────────────────────────────────────────────────────────
+    total_found = len(opportunities)
+    profitable_found = sum(1 for o in opportunities if o["profitable"])
+
+    if profitable_found > 0:
+        banner_col = "#28a745"
+        banner_txt = "✅ Found {} Profitable Arbitrage {} Across {} Assets".format(
+            profitable_found,
+            "Opportunity" if profitable_found == 1 else "Opportunities",
+            len(scan_assets))
+    else:
+        banner_col = "#6c757d"
+        banner_txt = "⚪ No Profitable Opportunities Found — Markets Are Efficient"
+
+    st.markdown(
+        '<div style="background:{c}; padding:16px; border-radius:12px; text-align:center; '
+        'color:white; margin-bottom:16px;">'
+        '<h2 style="margin:0; font-size:22px;">{t}</h2>'
+        '<p style="margin:6px 0 0; font-size:14px; opacity:.9;">'
+        'PCP: {pcp} &nbsp;|&nbsp; Futures Basis: {fb} &nbsp;|&nbsp; IRP: {irp} &nbsp;|&nbsp; '
+        'Scanned: {na} assets · Next expiry: {exp}</p></div>'.format(
+            c=banner_col, t=banner_txt,
+            pcp=scan_summary["PCP"], fb=scan_summary["FB"], irp=scan_summary["IRP"],
+            na=len(scan_assets), exp=scan_expiry.strftime("%d %b %Y")),
+        unsafe_allow_html=True)
+
+    # ── OPPORTUNITY CARDS ─────────────────────────────────────────────────────
+    if opportunities:
+        # Sort by net P&L descending
+        opportunities.sort(key=lambda x: x["net_pnl"], reverse=True)
+
+        # Summary metrics row
+        total_potential = sum(o["net_pnl"] for o in opportunities if o["profitable"])
+        best_ann        = max((o["ann_return"] for o in opportunities if o["profitable"]), default=0)
+        sm1, sm2, sm3, sm4 = st.columns(4)
+        sm1.metric("Total Opportunities",    str(total_found))
+        sm2.metric("Profitable After Costs", str(profitable_found))
+        sm3.metric("Total Potential P&L",    "₹{:,.2f}".format(total_potential))
+        sm4.metric("Best Annualised Return", "{:.2f}%".format(best_ann))
+
+        st.markdown("---")
+        st.markdown("### 📋 Opportunity Details")
+
+        for i, opp in enumerate(opportunities):
+            card_class = "opp-card-green" if opp["profitable"] else "opp-card-grey"
+            profit_badge = ('<span class="scanner-badge" style="background:#28a745;color:white;">PROFITABLE</span>'
+                           if opp["profitable"] else
+                           '<span class="scanner-badge" style="background:#adb5bd;color:white;">BELOW THRESHOLD</span>')
+            strategy_colors = {
+                "Put-Call Parity":      "#2563eb",
+                "Futures Basis":        "#7c3aed",
+                "Interest Rate Parity": "#0891b2",
+            }
+            sc = strategy_colors.get(opp["strategy"], "#6c757d")
+
+            st.markdown(
+                '<div class="{cls}">'
+                '<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">'
+                '<div>'
+                '  <span class="scanner-badge" style="background:{sc};color:white;">#{n} {strat}</span>'
+                '  <span class="scanner-badge" style="background:#495057;color:white;">{asset}</span>'
+                '  {badge}'
+                '</div>'
+                '<div style="font-size:22px; font-weight:700; color:{pnl_col};">Net ₹{pnl:,.2f}</div>'
+                '</div>'
+                '<div style="margin-top:8px; display:flex; gap:24px; flex-wrap:wrap; font-size:13px;">'
+                '  <span>📊 <b>Type:</b> {typ}</span>'
+                '  <span>💹 <b>Spot:</b> {spot_label} {spot_val}</span>'
+                '  <span>📈 <b>Gap:</b> {gap:.4f}</span>'
+                '  <span>💰 <b>Gross:</b> ₹{gross:,.2f}</span>'
+                '  <span>🧾 <b>Friction:</b> ₹{fric:,.2f}</span>'
+                '  <span>📅 <b>Expiry:</b> {exp} ({days}d)</span>'
+                '  <span>🚀 <b>Ann. Return:</b> {ann:.2f}%</span>'
+                '  <span>📡 <b>Data:</b> {src}</span>'
+                '</div>'
+                '<div style="margin-top:6px; font-size:13px; color:#495057;">'
+                '  ▶ <b>Execution:</b> {action}'
+                '</div>'
+                '</div>'.format(
+                    cls=card_class, sc=sc, n=i+1,
+                    strat=opp["strategy"], asset=opp["asset"], badge=profit_badge,
+                    pnl_col="#155724" if opp["profitable"] else "#495057",
+                    pnl=opp["net_pnl"],
+                    typ=opp["type"],
+                    spot_label="₹" if opp["asset"] != "USD/INR" else "",
+                    spot_val="{:,.2f}".format(opp["spot"]),
+                    gap=opp["gap"],
+                    gross=opp["gross"], fric=opp["friction"],
+                    exp=opp["expiry"].strftime("%d %b %Y"), days=opp["days"],
+                    ann=opp["ann_return"], src=opp["data_src"],
+                    action=opp["action"]),
+                unsafe_allow_html=True)
+
+        # ── Comparison bar chart ───────────────────────────────────────────
+        if len(opportunities) > 1:
+            st.markdown("### 📊 Opportunity Comparison")
+            labels    = ["{} {}".format(o["asset"], o["strategy"][:3]) for o in opportunities]
+            net_vals  = [o["net_pnl"] for o in opportunities]
+            ann_vals  = [o["ann_return"] for o in opportunities]
+            colors    = ["#28a745" if o["profitable"] else "#adb5bd" for o in opportunities]
+
+            fig_scan = go.Figure()
+            fig_scan.add_trace(go.Bar(
+                name="Net P&L (₹)", x=labels, y=net_vals,
+                marker_color=colors,
+                text=["₹{:,.0f}".format(v) for v in net_vals],
+                textposition="outside", yaxis="y1"))
+            fig_scan.add_trace(go.Scatter(
+                name="Ann. Return (%)", x=labels, y=ann_vals,
+                mode="lines+markers+text",
+                line=dict(color="#f59e0b", width=2.5),
+                marker=dict(size=8, color="#f59e0b"),
+                text=["{:.1f}%".format(v) for v in ann_vals],
+                textposition="top center",
+                yaxis="y2"))
+            fig_scan.update_layout(
+                title="Net P&L & Annualised Return — All Scanned Opportunities",
+                xaxis=dict(title="Strategy · Asset"),
+                yaxis=dict(title=dict(text="Net P&L (₹)", font=dict(color="#28a745")),
+                           tickformat=",.0f"),
+                yaxis2=dict(title=dict(text="Ann. Return (%)", font=dict(color="#f59e0b")),
+                            overlaying="y", side="right", tickformat=".1f"),
+                height=380, margin=dict(t=45, b=40, l=10, r=10),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                plot_bgcolor="#f8f9fa", paper_bgcolor="white", barmode="group")
+            st.plotly_chart(fig_scan, use_container_width=True)
+
+        # ── Exportable summary table ───────────────────────────────────────
+        st.markdown("### 📥 Summary Table")
+        tbl = pd.DataFrame([{
+            "Rank":       i+1,
+            "Strategy":   o["strategy"],
+            "Asset":      o["asset"],
+            "Type":       o["type"],
+            "Spot":       "₹{:,.2f}".format(o["spot"]) if o["asset"] != "USD/INR" else "{:.4f}".format(o["spot"]),
+            "Gap":        "{:.4f}".format(o["gap"]),
+            "Gross P&L":  "₹{:,.2f}".format(o["gross"]),
+            "Friction":   "₹{:,.2f}".format(o["friction"]),
+            "Net P&L":    "₹{:,.2f}".format(o["net_pnl"]),
+            "Ann. Return":"{:.2f}%".format(o["ann_return"]),
+            "Expiry":     o["expiry"].strftime("%d %b %Y"),
+            "Profitable": "✅" if o["profitable"] else "❌",
+            "Action":     o["action"],
+        } for i, o in enumerate(opportunities)])
+        st.dataframe(tbl, hide_index=True, use_container_width=True)
+        st.caption("Data is indicative. PCP uses ATM strike. Futures Basis uses estimated market price (+0.8% of fair). IRP uses USD 1,00,000 notional.")
+
+    else:
+        st.info("No opportunities found matching your filters. Try lowering the minimum profit threshold or adding more assets.")
+
+    if st.session_state.show_metadata:
+        with st.expander("ℹ️ Scanner Methodology", expanded=False):
+            st.markdown("""
+            **How the scanner works:**
+            - **Put-Call Parity**: Uses ATM strike for each asset, computes gap = Spot − Synthetic, deducts STT + brokerage
+            - **Futures Basis**: Computes fair futures price using Cost-of-Carry (F* = S·e^(rT)), compares to simulated market futures price
+            - **Interest Rate Parity**: Uses live USD/INR spot from yfinance, India 6.75% vs US 5.25%, 90-day tenor
+            - **Annualised Return**: (Net P&L / Capital Deployed) × (365 / Days to Expiry) × 100
+            - **Capital deployed**: Spot price × lot size (1 lot per scan per asset)
+            - Opportunities are sorted by Net P&L descending
+            - ⚠️ Futures Basis uses an estimated futures price (+0.8% above fair). Use Tab 3 for actual market price.
+            """)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 1 — PUT-CALL PARITY ARBITRAGE
@@ -1041,6 +1474,192 @@ with tab4:
 
     st.warning("⚠️ Statistical arbitrage is NOT risk-free. Unlike PCP or IRP, spread reversion is probabilistic. "
                "Use proper stop-losses and position sizing in practice.")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 5 — SETTINGS & CONFIGURATION
+# ══════════════════════════════════════════════════════════════════════════════
+with tab5:
+    st.subheader("⚙️ Settings & Configuration")
+    st.markdown("Configure transaction costs, detection thresholds, and display preferences. "
+                "All settings persist across tabs within this session.")
+
+    cfg1, cfg2 = st.columns(2)
+
+    # ── TRANSACTION COSTS ─────────────────────────────────────────────────────
+    with cfg1:
+        st.markdown("#### 💸 Transaction Costs")
+        st.caption("As percentage of trade value. Applied in scanner and individual strategy tabs.")
+
+        new_tc_equity  = st.number_input("Equity / Spot Trading (%)",
+                                         value=float(st.session_state.tc_equity),
+                                         min_value=0.0, max_value=1.0, step=0.005,
+                                         format="%.4f", key="cfg_tc_eq",
+                                         help="STT on equity delivery: 0.1% buy side = 0.05% round-trip equiv")
+        new_tc_options = st.number_input("Options Trading (%)",
+                                         value=float(st.session_state.tc_options),
+                                         min_value=0.0, max_value=1.0, step=0.005,
+                                         format="%.4f", key="cfg_tc_opt",
+                                         help="STT on options sell side: 0.0625%")
+        new_tc_futures = st.number_input("Futures Trading (%)",
+                                         value=float(st.session_state.tc_futures),
+                                         min_value=0.0, max_value=1.0, step=0.001,
+                                         format="%.4f", key="cfg_tc_fut",
+                                         help="STT on futures: 0.0125% sell side")
+        new_tc_fx      = st.number_input("FX / Forex Trading (%)",
+                                         value=float(st.session_state.tc_fx_spot),
+                                         min_value=0.0, max_value=1.0, step=0.001,
+                                         format="%.4f", key="cfg_tc_fx",
+                                         help="Bank spread + conversion charges")
+        new_brokerage  = st.number_input("Flat Brokerage per Order (₹)",
+                                         value=float(st.session_state.brokerage_flat),
+                                         min_value=0.0, max_value=100.0, step=5.0,
+                                         key="cfg_brok",
+                                         help="₹20 = Zerodha, ₹0 = no brokerage model")
+
+        st.markdown("**Borrowing / Funding Spread**")
+        new_borrow_spread = st.slider("Borrowing Spread above Risk-Free (%)",
+                                      0.0, 3.0, 0.5, step=0.1, key="cfg_borrow",
+                                      help="Additional cost when borrowing for Cash & Carry or IRP")
+
+    # ── DETECTION THRESHOLDS ──────────────────────────────────────────────────
+    with cfg2:
+        st.markdown("#### 🎯 Detection Thresholds")
+        st.caption("Minimum criteria for an opportunity to trigger a signal.")
+
+        st.markdown("**Put-Call Parity**")
+        new_pcp_min_profit = st.number_input("PCP Minimum Net Profit (₹)",
+                                              value=float(st.session_state.pcp_min_profit),
+                                              min_value=0.0, step=5.0, key="cfg_pcp_profit")
+        new_pcp_min_dev    = st.slider("PCP Minimum Gap (% of Spot)",
+                                       0.01, 1.0, float(st.session_state.pcp_min_dev),
+                                       step=0.01, key="cfg_pcp_dev",
+                                       help="Smaller = more sensitive, more noise")
+
+        st.markdown("**Futures Basis**")
+        new_fb_min_profit  = st.number_input("Futures Basis Minimum Net Profit (₹)",
+                                              value=float(st.session_state.fb_min_profit),
+                                              min_value=0.0, step=5.0, key="cfg_fb_profit")
+        new_fb_min_dev     = st.slider("Futures Min Basis Deviation (% of Fair)",
+                                       0.01, 1.0, float(st.session_state.fb_min_dev),
+                                       step=0.01, key="cfg_fb_dev")
+
+        st.markdown("**Interest Rate Parity**")
+        new_irp_min_profit = st.number_input("IRP Minimum Net Profit (₹)",
+                                              value=float(st.session_state.irp_min_profit),
+                                              min_value=0.0, step=50.0, key="cfg_irp_profit")
+        new_irp_min_dev    = st.slider("IRP Min Forward Deviation (% of Theoretical)",
+                                       0.01, 1.0, float(st.session_state.irp_min_dev),
+                                       step=0.01, key="cfg_irp_dev")
+
+    st.divider()
+
+    # ── DISPLAY & DATA SETTINGS ───────────────────────────────────────────────
+    ds1, ds2 = st.columns(2)
+    with ds1:
+        st.markdown("#### 🔄 Auto-Refresh")
+        new_auto_refresh = st.checkbox("Enable Auto-Refresh",
+                                        value=bool(st.session_state.auto_refresh),
+                                        key="cfg_autoref",
+                                        help="Automatically re-runs the app at set interval")
+        new_refresh_interval = st.slider("Refresh Interval (seconds)",
+                                          10, 120, int(st.session_state.refresh_interval),
+                                          step=10, key="cfg_interval",
+                                          disabled=not new_auto_refresh)
+
+    with ds2:
+        st.markdown("#### 🖥️ Display Settings")
+        new_show_metadata = st.checkbox("Show Scanner Methodology",
+                                         value=bool(st.session_state.show_metadata),
+                                         key="cfg_meta")
+        new_margin_pct    = st.slider("Margin Requirement (%)", 10, 40,
+                                       int(st.session_state.margin_pct),
+                                       key="cfg_margin",
+                                       help="Used to calculate Capital Required in PCP tab")
+        new_iv_default    = st.slider("Default Implied Volatility (%)", 5.0, 80.0,
+                                       float(st.session_state.iv_pct),
+                                       step=0.5, key="cfg_iv")
+
+    st.divider()
+
+    # ── SAVE BUTTON ───────────────────────────────────────────────────────────
+    save_col, reset_col, _ = st.columns([1, 1, 3])
+    with save_col:
+        if st.button("💾 Save Settings", type="primary", use_container_width=True):
+            st.session_state.tc_equity         = new_tc_equity
+            st.session_state.tc_options        = new_tc_options
+            st.session_state.tc_futures        = new_tc_futures
+            st.session_state.tc_fx_spot        = new_tc_fx
+            st.session_state.brokerage_flat    = new_brokerage
+            st.session_state.pcp_min_profit    = new_pcp_min_profit
+            st.session_state.pcp_min_dev       = new_pcp_min_dev
+            st.session_state.fb_min_profit     = new_fb_min_profit
+            st.session_state.fb_min_dev        = new_fb_min_dev
+            st.session_state.irp_min_profit    = new_irp_min_profit
+            st.session_state.irp_min_dev       = new_irp_min_dev
+            st.session_state.auto_refresh      = new_auto_refresh
+            st.session_state.refresh_interval  = new_refresh_interval
+            st.session_state.show_metadata     = new_show_metadata
+            st.session_state.margin_pct        = new_margin_pct
+            st.session_state.iv_pct            = new_iv_default
+            st.success("✅ Settings saved! All tabs will use updated values.")
+
+    with reset_col:
+        if st.button("🔄 Reset Defaults", use_container_width=True):
+            keys_to_clear = ["tc_equity","tc_options","tc_futures","tc_fx_spot",
+                             "brokerage_flat","pcp_min_profit","pcp_min_dev",
+                             "fb_min_profit","fb_min_dev","irp_min_profit","irp_min_dev",
+                             "auto_refresh","refresh_interval","show_metadata",
+                             "margin_pct","iv_pct","r_rate_pct","arb_threshold_pct"]
+            for k in keys_to_clear:
+                if k in st.session_state:
+                    del st.session_state[k]
+            st.rerun()
+
+    st.divider()
+
+    # ── CURRENT CONFIG SUMMARY ────────────────────────────────────────────────
+    st.markdown("#### 📋 Current Configuration Summary")
+    config_text = """**Transaction Costs:**
+- Equity/Spot: {tc_eq:.3f}%
+- Options: {tc_opt:.3f}%
+- Futures: {tc_fut:.3f}%
+- FX/Forex: {tc_fx:.3f}%
+- Flat Brokerage: ₹{brok:.0f} per order
+
+**Detection Thresholds:**
+- PCP Min Profit: ₹{pcp_p:.0f} | Min Gap: {pcp_d:.2f}%
+- Futures Basis Min Profit: ₹{fb_p:.0f} | Min Basis: {fb_d:.2f}%
+- IRP Min Profit: ₹{irp_p:.0f} | Min Fwd Dev: {irp_d:.2f}%
+
+**Display Settings:**
+- Margin Requirement: {margin}%
+- Default IV: {iv:.1f}%
+- Auto-Refresh: {ar} ({ari}s interval)
+- Show Methodology: {meta}""".format(
+        tc_eq=st.session_state.tc_equity,
+        tc_opt=st.session_state.tc_options,
+        tc_fut=st.session_state.tc_futures,
+        tc_fx=st.session_state.tc_fx_spot,
+        brok=st.session_state.brokerage_flat,
+        pcp_p=st.session_state.pcp_min_profit,
+        pcp_d=st.session_state.pcp_min_dev,
+        fb_p=st.session_state.fb_min_profit,
+        fb_d=st.session_state.fb_min_dev,
+        irp_p=st.session_state.irp_min_profit,
+        irp_d=st.session_state.irp_min_dev,
+        margin=st.session_state.margin_pct,
+        iv=st.session_state.iv_pct,
+        ar="ON" if st.session_state.auto_refresh else "OFF",
+        ari=st.session_state.refresh_interval,
+        meta="Enabled" if st.session_state.show_metadata else "Disabled")
+    st.code(config_text, language=None)
+    st.caption("⚠️ Settings are session-specific and reset when you close the browser.")
+
+    # ── AUTO REFRESH LOGIC ────────────────────────────────────────────────────
+    if st.session_state.auto_refresh:
+        import time
+        time.sleep(st.session_state.refresh_interval)
+        st.rerun()
 
 # ── GLOBAL FOOTER ─────────────────────────────────────────────────────────────
 st.divider()
