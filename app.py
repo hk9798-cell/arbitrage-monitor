@@ -354,16 +354,13 @@ with tab0:
             atm_sc    = float(round(sp_sc / step_sc) * step_sc)
 
            # ── PUT-CALL PARITY ────────────────────────────────────────────
-            if "Put-Call Parity" in scan_strategies:
+           if "Put-Call Parity" in scan_strategies:
                 def _lkp(df, k):
-                    if df is None or df.empty: return None
+                    if df.empty: return None
                     mask = np.isclose(df["strike"].values, k, rtol=0, atol=step_sc*0.4)
                     if not mask.any(): return None
                     p = df.loc[mask, "lastPrice"].values[0]
                     return float(round(p, 2)) if p > 0 else None
-
-                # Recalculate strike for the current asset in loop (SBIN, RELIANCE, etc.)
-                atm_sc = float(round(sp_sc / step_sc) * step_sc)
 
                 c_sc = _lkp(calls_sc, atm_sc)
                 p_sc = _lkp(puts_sc,  atm_sc)
@@ -391,10 +388,16 @@ with tab0:
                             "type":        strategy_name,
                             "spot":        sp_sc,
                             "gap":         gap_sc,
+                            "gross":       gross_sc,
+                            "friction":    fric_sc,
                             "net_pnl":     net_sc,
                             "ann_return":  ann_ret_sc,
+                            "expiry":      scan_expiry,
+                            "days":        (scan_expiry - today_sc).days,
                             "profitable":  profitable,
-                            "action":      "Check Parity",
+                            "action":      ("Buy Spot · Buy Put · Sell Call"
+                                            if gap_sc > 0 else
+                                            "Short Spot · Sell Put · Buy Call"),
                             "data_src":    spot_data[6],
                         })
             # ── FUTURES BASIS ──────────────────────────────────────────────
