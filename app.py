@@ -1065,11 +1065,14 @@ with tab2:
               delta="≈ USD {:,.2f}".format(irp_net_usd), delta_color="off")
 
     st.markdown(
-        '<div style="background:{c}; padding:14px; border-radius:10px; text-align:center; color:white; margin:12px 0;">'
-        '<h2 style="margin:0; font-size:20px;">{s}</h2>'
-        '<p style="margin:4px 0 0; font-size:14px; opacity:.9;">Notional: USD {:,.0f} | Maturity: {} ({} days)</p>'
-        '</div>'.format(irp_color, irp_signal, notional_usd, irp_expiry.strftime("%d %b %Y"), irp_days),
-        unsafe_allow_html=True)
+    '''
+    <div style="background:{0}; padding:14px; border-radius:10px; text-align:center; color:white; margin:12px 0;">
+        <h2 style="margin:0; font-size:20px;">{1}</h2>
+        <p style="margin:4px 0 0; font-size:14px; opacity:.9;">Notional: USD {2:,.0f} | Maturity: {3} ({4} days)</p>
+    </div>
+    '''.format(irp_color, irp_signal, notional_usd, irp_expiry.strftime("%d %b %Y"), irp_days),
+    unsafe_allow_html=True
+)
 
     st.markdown("#### 📐 Detailed Calculation")
     irp_calc = pd.DataFrame({
