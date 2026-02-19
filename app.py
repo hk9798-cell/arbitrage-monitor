@@ -215,6 +215,20 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# ── CONSTANTS ─────────────────────────────────────────────────────────────────
+LOT_SIZES      = {"NIFTY": 50,   "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
+STRIKE_STEP    = {"NIFTY": 50,   "RELIANCE": 20,  "TCS": 50,  "SBIN": 5,    "INFY": 20}
+FALLBACK_SPOTS = {"NIFTY": 25800.0, "RELIANCE": 1420.0, "TCS": 3850.0, "SBIN": 810.0, "INFY": 1580.0}
+TICKER_MAP     = {"NIFTY": "^NSEI", "RELIANCE": "RELIANCE.NS", "TCS": "TCS.NS", "SBIN": "SBIN.NS", "INFY": "INFY.NS"}
+FUTURES_TICKER = {"NIFTY": "^NSEI", "RELIANCE": "RELIANCE.NS", "TCS": "TCS.NS", "SBIN": "SBIN.NS", "INFY": "INFY.NS"}
+NSE_CHAIN_URLS = {
+    "NIFTY":    "https://www.nseindia.com/option-chain",
+    "RELIANCE": "https://www.nseindia.com/get-quotes/derivatives?symbol=RELIANCE",
+    "TCS":      "https://www.nseindia.com/get-quotes/derivatives?symbol=TCS",
+    "SBIN":     "https://www.nseindia.com/get-quotes/derivatives?symbol=SBIN",
+    "INFY":     "https://www.nseindia.com/get-quotes/derivatives?symbol=INFY",
+}
+
 # ── FEATURE 1: LIVE MARKET STATUS TICKER BAR ─────────────────────────────────
 @st.cache_data(ttl=120, show_spinner=False)
 def get_ticker_bar_data():
@@ -267,19 +281,7 @@ for asset_name, d in ticker_data.items():
 ticker_html += '<span style="margin-left:auto;font-size:11px;color:#475569;">Updated: {t}</span></div>'.format(t=now_str)
 st.markdown(ticker_html, unsafe_allow_html=True)
 
-# ── CONSTANTS ─────────────────────────────────────────────────────────────────
-LOT_SIZES      = {"NIFTY": 50,   "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
-STRIKE_STEP    = {"NIFTY": 50,   "RELIANCE": 20,  "TCS": 50,  "SBIN": 5,    "INFY": 20}
-FALLBACK_SPOTS = {"NIFTY": 25800.0, "RELIANCE": 1420.0, "TCS": 3850.0, "SBIN": 810.0, "INFY": 1580.0}
-TICKER_MAP     = {"NIFTY": "^NSEI", "RELIANCE": "RELIANCE.NS", "TCS": "TCS.NS", "SBIN": "SBIN.NS", "INFY": "INFY.NS"}
-FUTURES_TICKER = {"NIFTY": "^NSEI", "RELIANCE": "RELIANCE.NS", "TCS": "TCS.NS", "SBIN": "SBIN.NS", "INFY": "INFY.NS"}
-NSE_CHAIN_URLS = {
-    "NIFTY":    "https://www.nseindia.com/option-chain",
-    "RELIANCE": "https://www.nseindia.com/get-quotes/derivatives?symbol=RELIANCE",
-    "TCS":      "https://www.nseindia.com/get-quotes/derivatives?symbol=TCS",
-    "SBIN":     "https://www.nseindia.com/get-quotes/derivatives?symbol=SBIN",
-    "INFY":     "https://www.nseindia.com/get-quotes/derivatives?symbol=INFY",
-}
+
 
 # ── BSM GREEKS ENGINE ─────────────────────────────────────────────────────────
 def _bsm_d1d2(S, K, r, T, sigma):
