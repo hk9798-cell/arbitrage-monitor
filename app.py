@@ -91,7 +91,7 @@ st.title("🏛️ Cross-Asset Arbitrage Opportunity Monitor")
 st.caption("IIT Roorkee · Department of Management Studies · Financial Engineering Project")
 
 # ── CONSTANTS ─────────────────────────────────────────────────────────────────
-LOT_SIZES      = {"NIFTY": 65,   "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
+LOT_SIZES      = {"NIFTY": 50,   "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
 STRIKE_STEP    = {"NIFTY": 50,   "RELIANCE": 20,  "TCS": 50,  "SBIN": 5,    "INFY": 20}
 FALLBACK_SPOTS = {"NIFTY": 25800.0, "RELIANCE": 1420.0, "TCS": 3850.0, "SBIN": 810.0, "INFY": 1580.0}
 TICKER_MAP     = {"NIFTY": "^NSEI", "RELIANCE": "RELIANCE.NS", "TCS": "TCS.NS", "SBIN": "SBIN.NS", "INFY": "INFY.NS"}
@@ -353,8 +353,8 @@ with tab0:
             step_sc   = float(STRIKE_STEP[asset_sc])
             atm_sc    = float(round(sp_sc / step_sc) * step_sc)
 
-           # ── PUT-CALL PARITY ────────────────────────────────────────────
-           if "Put-Call Parity" in scan_strategies:
+            # ── PUT-CALL PARITY ────────────────────────────────────────────
+            if "Put-Call Parity" in scan_strategies:
                 def _lkp(df, k):
                     if df.empty: return None
                     mask = np.isclose(df["strike"].values, k, rtol=0, atol=step_sc*0.4)
@@ -400,6 +400,7 @@ with tab0:
                                             "Short Spot · Sell Put · Buy Call"),
                             "data_src":    spot_data[6],
                         })
+
             # ── FUTURES BASIS ──────────────────────────────────────────────
             if "Futures Basis" in scan_strategies:
                 carry_sc   = scan_r   # no dividend assumption
@@ -1064,14 +1065,11 @@ with tab2:
               delta="≈ USD {:,.2f}".format(irp_net_usd), delta_color="off")
 
     st.markdown(
-    '''
-    <div style="background:{0}; padding:14px; border-radius:10px; text-align:center; color:white; margin:12px 0;">
-        <h2 style="margin:0; font-size:20px;">{1}</h2>
-        <p style="margin:4px 0 0; font-size:14px; opacity:.9;">Notional: USD {2:,.0f} | Maturity: {3} ({4} days)</p>
-    </div>
-    '''.format(irp_color, irp_signal, notional_usd, irp_expiry.strftime("%d %b %Y"), irp_days),
-    unsafe_allow_html=True
-)
+        '<div style="background:{c}; padding:14px; border-radius:10px; text-align:center; color:white; margin:12px 0;">'
+        '<h2 style="margin:0; font-size:20px;">{s}</h2>'
+        '<p style="margin:4px 0 0; font-size:14px; opacity:.9;">Notional: USD {:,.0f} | Maturity: {} ({} days)</p>'
+        '</div>'.format(irp_color, irp_signal, notional_usd, irp_expiry.strftime("%d %b %Y"), irp_days),
+        unsafe_allow_html=True)
 
     st.markdown("#### 📐 Detailed Calculation")
     irp_calc = pd.DataFrame({
