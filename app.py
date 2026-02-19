@@ -22,7 +22,7 @@ st.markdown("""
 
 st.title("🏛️ Cross-Asset Arbitrage Opportunity Monitor")
 
-TICKER_MAP = {"NIFTY": "^NSEI", "RELIANCE": "RELIANCE.NS", "TCS": "TCS.NS", "SBIN": "SBIN.NS", "INFY": "INFY.NS"}
+TICKER_MAP = {"NIFTY": "^NSEI", "RELIANCE": "RELIANCE.NS", "TCS": "TCS.NS", "SBIN": "SBIN.NS", "INFY": "INFY.NS"}  # yfinance fallback only
 LOT_SIZES = {"NIFTY": 65, "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
 STRIKE_STEP = {"NIFTY": 50, "RELIANCE": 20, "TCS": 50, "SBIN": 5, "INFY": 20}
 FALLBACK_SPOTS = {"NIFTY": 24500.0, "RELIANCE": 1280.0, "TCS": 3850.0, "SBIN": 810.0, "INFY": 1580.0}
@@ -42,33 +42,123 @@ with st.sidebar:
                                   value=0.05, step=0.01,
                                   help="Minimum gap as % of spot. Filters bid-ask noise.")
 
-@st.cache_data(ttl=60, show_spinner=False)
-def get_market_data(ticker, asset_name):
-    try:
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period="2d")
-        if hist.empty or "Close" not in hist.columns:
-            raise ValueError("No price data returned.")
-        spot = float(round(hist["Close"].iloc[-1], 2))
-        if not stock.options:
-            return spot, pd.DataFrame(), pd.DataFrame(), None, "No options data for this asset."
-        expiry = stock.options[0]
-        chain = stock.option_chain(expiry)
-        calls = chain.calls.copy()
-        puts = chain.puts.copy()
-        calls["strike"] = calls["strike"].astype(float)
-        puts["strike"] = puts["strike"].astype(float)
-        return spot, calls, puts, expiry, None
-    except Exception as e:
-        return FALLBACK_SPOTS[asset_name], pd.DataFrame(), pd.DataFrame(), None, str(e)
+import requests
 
-with st.spinner("Fetching live data for {}...".format(asset)):
-    s0, calls_df, puts_df, expiry_date, fetch_error = get_market_data(TICKER_MAP[asset], asset)
+# NSE symbol map (used for NSE API)
+NSE_SYMBOL_MAP = {
+    "NIFTY":    "NIFTY",
+    "RELIANCE": "RELIANCE",
+    "TCS":      "TCS",
+    "SBIN":     "SBIN",
+    "INFY":     "INFY",
+}
+
+NSE_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Referer": "https://www.nseindia.com/",
+    "Accept": "application/json, text/plain, /",
+}
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_nse_session_cookies():
+    """Warm up NSE session to get valid cookies (required for API calls)."""
+    try:
+        session = requests.Session()
+        session.get("https://www.nseindia.com", headers=NSE_HEADERS, timeout=10)
+        return dict(session.cookies)
+    except Exception:
+        return {}
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_market_data(asset_name):
+    """
+    Fetch live spot price and option chain from NSE India API.
+    Falls back to yfinance as secondary, then static fallback.
+    Returns (spot, calls_df, puts_df, expiry_date, error_msg).
+    """
+    symbol = NSE_SYMBOL_MAP[asset_name]
+
+    # ── PRIMARY: NSE India API ─────────────────────────────────────────────
+    try:
+        cookies = get_nse_session_cookies()
+        is_index = (asset_name == "NIFTY")
+
+        if is_index:
+            url = "https://www.nseindia.com/api/option-chain-indices?symbol={}".format(symbol)
+        else:
+            url = "https://www.nseindia.com/api/option-chain-equities?symbol={}".format(symbol)
+
+        resp = requests.get(url, headers=NSE_HEADERS, cookies=cookies, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+
+        spot = float(data["records"]["underlyingValue"])
+        expiries = data["records"]["expiryDates"]
+        expiry = expiries[0]
+
+        calls_rows, puts_rows = [], []
+        for rec in data["records"]["data"]:
+            if rec.get("expiryDate") != expiry:
+                continue
+            k = float(rec["strikePrice"])
+            if "CE" in rec:
+                ce = rec["CE"]
+                calls_rows.append({
+                    "strike":        k,
+                    "lastPrice":     float(ce.get("lastPrice", 0)),
+                    "openInterest":  float(ce.get("openInterest", 0)),
+                    "volume":        float(ce.get("totalTradedVolume", 0)),
+                    "impliedVolatility": float(ce.get("impliedVolatility", 0)),
+                })
+            if "PE" in rec:
+                pe = rec["PE"]
+                puts_rows.append({
+                    "strike":        k,
+                    "lastPrice":     float(pe.get("lastPrice", 0)),
+                    "openInterest":  float(pe.get("openInterest", 0)),
+                    "volume":        float(pe.get("totalTradedVolume", 0)),
+                    "impliedVolatility": float(pe.get("impliedVolatility", 0)),
+                })
+
+        calls_df = pd.DataFrame(calls_rows)
+        puts_df  = pd.DataFrame(puts_rows)
+        return round(spot, 2), calls_df, puts_df, expiry, None
+
+    except Exception as nse_err:
+        pass  # Try yfinance fallback
+
+    # ── SECONDARY: yfinance ────────────────────────────────────────────────
+    try:
+        ticker_sym = {"NIFTY": "^NSEI", "RELIANCE": "RELIANCE.NS",
+                      "TCS": "TCS.NS", "SBIN": "SBIN.NS", "INFY": "INFY.NS"}[asset_name]
+        stock = yf.Ticker(ticker_sym)
+        hist  = stock.history(period="2d")
+        if hist.empty:
+            raise ValueError("yfinance returned empty history.")
+        spot = float(round(hist["Close"].iloc[-1], 2))
+        if stock.options:
+            expiry = stock.options[0]
+            chain  = stock.option_chain(expiry)
+            calls  = chain.calls.copy()
+            puts   = chain.puts.copy()
+            calls["strike"] = calls["strike"].astype(float)
+            puts["strike"]  = puts["strike"].astype(float)
+            return spot, calls, puts, expiry, "NSE API unavailable — using yfinance (15min delay)"
+        return spot, pd.DataFrame(), pd.DataFrame(), None, "yfinance: no options chain available."
+    except Exception as yf_err:
+        return (FALLBACK_SPOTS[asset_name], pd.DataFrame(), pd.DataFrame(), None,
+                "All live sources failed. Using static fallback price.")
+
+with st.spinner("Fetching live data for {} from NSE...".format(asset)):
+    s0, calls_df, puts_df, expiry_date, fetch_error = get_market_data(asset)
 
 if fetch_error:
-    st.warning("⚠️ Live data issue: {}  |  Fallback spot: ₹{:,.2f}".format(fetch_error, s0))
+    st.warning("⚠️  {}  |  Spot: ₹{:,.2f}".format(fetch_error, s0))
 if expiry_date:
-    st.caption("📅 Option chain loaded for expiry: *{}*".format(expiry_date))
+    st.caption("📅 NSE option chain loaded — Expiry: *{}*  |  Spot: ₹{:,.2f}".format(expiry_date, s0))
 
 lot = LOT_SIZES[asset]
 total_units = num_lots * lot
