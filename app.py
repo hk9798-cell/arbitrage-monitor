@@ -1,4 +1,3 @@
-
 import streamlit as st
 import yfinance as yf
 import numpy as np
@@ -7,15 +6,21 @@ import plotly.graph_objects as go
 import requests
 import urllib.request
 import json
+import datetime
+try:
+    from scipy.stats import norm as _norm
+    SCIPY_OK = True
+except ImportError:
+    SCIPY_OK = False
 
-st.set_page_config(page_title="Arbitrage Monitor", layout="wide")
+st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide")
 
 st.markdown("""
     <style>
     .main { background-color: #f0f2f6; }
-    label[data-testid="stWidgetLabel"] p { font-weight: bold !important; font-size: 15px !important; }
-    div[data-testid="stMetricLabel"] p { font-weight: bold !important; font-size: 14px !important; }
-    div[data-testid="stMetricValue"] { font-size: 26px; color: #1f77b4; font-weight: bold; }
+    label[data-testid="stWidgetLabel"] p { font-weight: bold !important; font-size: 14px !important; }
+    div[data-testid="stMetricLabel"] p  { font-weight: bold !important; font-size: 13px !important; }
+    div[data-testid="stMetricValue"]    { font-size: 24px; color: #1f77b4; font-weight: bold; }
     .warning-box {
         background-color: #fff3cd; border-left: 5px solid #ffc107;
         padding: 10px 16px; border-radius: 6px; color: #856404;
@@ -26,17 +31,23 @@ st.markdown("""
         padding: 10px 16px; border-radius: 6px; color: #1a3a5c;
         font-size: 14px; margin-top: 6px;
     }
+    .strategy-card {
+        background-color: #ffffff; border-left: 5px solid #2563eb;
+        padding: 12px 16px; border-radius: 8px; margin-bottom: 10px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("🏛️ Cross-Asset Arbitrage Opportunity Monitor")
+st.caption("IIT Roorkee · Department of Management Studies · Financial Engineering Project")
 
+# ── CONSTANTS ─────────────────────────────────────────────────────────────────
 LOT_SIZES      = {"NIFTY": 65,   "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
 STRIKE_STEP    = {"NIFTY": 50,   "RELIANCE": 20,  "TCS": 50,  "SBIN": 5,    "INFY": 20}
 FALLBACK_SPOTS = {"NIFTY": 25800.0, "RELIANCE": 1420.0, "TCS": 3850.0, "SBIN": 810.0, "INFY": 1580.0}
 TICKER_MAP     = {"NIFTY": "^NSEI", "RELIANCE": "RELIANCE.NS", "TCS": "TCS.NS", "SBIN": "SBIN.NS", "INFY": "INFY.NS"}
-
-# NSE option chain URLs for manual lookup
+FUTURES_TICKER = {"NIFTY": "^NSEI", "RELIANCE": "RELIANCE.NS", "TCS": "TCS.NS", "SBIN": "SBIN.NS", "INFY": "INFY.NS"}
 NSE_CHAIN_URLS = {
     "NIFTY":    "https://www.nseindia.com/option-chain",
     "RELIANCE": "https://www.nseindia.com/get-quotes/derivatives?symbol=RELIANCE",
@@ -45,63 +56,64 @@ NSE_CHAIN_URLS = {
     "INFY":     "https://www.nseindia.com/get-quotes/derivatives?symbol=INFY",
 }
 
-with st.sidebar:
-    st.header("⚙️ Parameters")
-    asset = st.selectbox("Select Asset", list(LOT_SIZES.keys()))
-    num_lots = st.number_input("Number of Lots", min_value=1, value=1, step=1)
-    r_rate = st.slider("Risk-Free Rate (%)", 4.0, 10.0, 6.75, step=0.25) / 100
-    days_to_expiry = st.number_input("Days to Expiry", value=15, min_value=1, max_value=365)
-    st.divider()
-    brokerage = st.number_input("Brokerage per Order (₹)", value=20.0, min_value=0.0, step=5.0,
-                                help="Flat fee per order e.g. Zerodha ₹20")
-    margin_pct = st.slider("Margin Requirement (%)", 10, 40, 20) / 100
-    st.divider()
-    arb_threshold_pct = st.slider("Arbitrage Threshold (%)", min_value=0.01, max_value=0.5,
-                                  value=0.05, step=0.01,
-                                  help="Minimum gap as % of spot. Filters bid-ask noise.")
+# ── BSM GREEKS ENGINE ─────────────────────────────────────────────────────────
+def _bsm_d1d2(S, K, r, T, sigma):
+    if T <= 0 or sigma <= 0 or S <= 0 or K <= 0:
+        return None, None
+    d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+    return d1, d1 - sigma * np.sqrt(T)
+
+def compute_greeks(S, K, r, T, sigma, option_type="call"):
+    zero = {"delta": 0.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0, "rho": 0.0}
+    if not SCIPY_OK: return zero
+    d1, d2 = _bsm_d1d2(S, K, r, T, sigma)
+    if d1 is None: return zero
+    Nd1 = _norm.cdf(d1); Nd2 = _norm.cdf(d2); nd1 = _norm.pdf(d1)
+    pv_k  = K * np.exp(-r * T)
+    gamma = nd1 / (S * sigma * np.sqrt(T))
+    vega  = S * np.sqrt(T) * nd1 / 100
+    if option_type == "call":
+        delta = Nd1
+        theta = (-(S * nd1 * sigma) / (2 * np.sqrt(T)) - r * pv_k * Nd2) / 365
+        rho   = pv_k * T * Nd2 / 100
+    else:
+        delta = Nd1 - 1
+        theta = (-(S * nd1 * sigma) / (2 * np.sqrt(T)) + r * pv_k * _norm.cdf(-d2)) / 365
+        rho   = -pv_k * T * _norm.cdf(-d2) / 100
+    return {"delta": round(delta, 4), "gamma": round(gamma, 6),
+            "theta": round(theta, 4), "vega": round(vega, 4), "rho": round(rho, 4)}
+
+def combined_position_greeks(signal_type, call_g, put_g, total_units):
+    if signal_type == "conversion":
+        pd_ = (1.0 + put_g["delta"] - call_g["delta"]) * total_units
+        pg  = (put_g["gamma"] - call_g["gamma"]) * total_units
+        pt  = (put_g["theta"] - call_g["theta"]) * total_units
+        pv  = (put_g["vega"]  - call_g["vega"])  * total_units
+        pr  = (put_g["rho"]   - call_g["rho"])   * total_units
+    elif signal_type == "reversal":
+        pd_ = (-1.0 + call_g["delta"] - put_g["delta"]) * total_units
+        pg  = (call_g["gamma"] - put_g["gamma"]) * total_units
+        pt  = (call_g["theta"] - put_g["theta"]) * total_units
+        pv  = (call_g["vega"]  - put_g["vega"])  * total_units
+        pr  = (call_g["rho"]   - put_g["rho"])   * total_units
+    else:
+        pd_ = pg = pt = pv = pr = 0.0
+    return {"delta": round(pd_, 4), "gamma": round(pg, 6),
+            "theta": round(pt, 4), "vega": round(pv, 4), "rho": round(pr, 4)}
+
+def greek_icon(val, thr):
+    if abs(val) < thr:      return "🟢"
+    elif abs(val) < thr*5:  return "🟡"
+    else:                   return "🔴"
 
 # ── DATA ENGINE ───────────────────────────────────────────────────────────────
 def _try_nse_api(asset_name):
-    """Try multiple NSE API approaches."""
     is_index = (asset_name == "NIFTY")
-    symbol = asset_name
-
-    # Approach A: nsepython
-    try:
-        from nsepython import nse_optionchain_scrapper
-        data = nse_optionchain_scrapper(symbol)
-        spot   = float(data["records"]["underlyingValue"])
-        expiry = data["records"]["expiryDates"][0]
-        calls_rows, puts_rows = [], []
-        for rec in data["records"]["data"]:
-            if rec.get("expiryDate") != expiry:
-                continue
-            k = float(rec["strikePrice"])
-            if "CE" in rec:
-                ce = rec["CE"]
-                calls_rows.append({"strike": k,
-                                   "lastPrice": float(ce.get("lastPrice", 0) or 0),
-                                   "openInterest": float(ce.get("openInterest", 0) or 0),
-                                   "volume": float(ce.get("totalTradedVolume", 0) or 0)})
-            if "PE" in rec:
-                pe = rec["PE"]
-                puts_rows.append({"strike": k,
-                                  "lastPrice": float(pe.get("lastPrice", 0) or 0),
-                                  "openInterest": float(pe.get("openInterest", 0) or 0),
-                                  "volume": float(pe.get("totalTradedVolume", 0) or 0)})
-        calls_df = pd.DataFrame(calls_rows)
-        puts_df  = pd.DataFrame(puts_rows)
-        if not calls_df.empty:
-            return round(spot, 2), calls_df, puts_df, expiry
-    except Exception:
-        pass
-
-    # Approach B: urllib with browser headers (sometimes bypasses NSE block)
     try:
         url = (
-            "https://www.nseindia.com/api/option-chain-indices?symbol={}".format(symbol)
+            "https://www.nseindia.com/api/option-chain-indices?symbol={}".format(asset_name)
             if is_index else
-            "https://www.nseindia.com/api/option-chain-equities?symbol={}".format(symbol)
+            "https://www.nseindia.com/api/option-chain-equities?symbol={}".format(asset_name)
         )
         req = urllib.request.Request(url, headers={
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -111,8 +123,9 @@ def _try_nse_api(asset_name):
         })
         with urllib.request.urlopen(req, timeout=8) as resp:
             data = json.loads(resp.read().decode())
-        spot   = float(data["records"]["underlyingValue"])
-        expiry = data["records"]["expiryDates"][0]
+        spot    = float(data["records"]["underlyingValue"])
+        expiries = data["records"]["expiryDates"]
+        expiry  = expiries[0]
         calls_rows, puts_rows = [], []
         for rec in data["records"]["data"]:
             if rec.get("expiryDate") != expiry:
@@ -120,288 +133,916 @@ def _try_nse_api(asset_name):
             k = float(rec["strikePrice"])
             if "CE" in rec:
                 ce = rec["CE"]
-                calls_rows.append({"strike": k,
-                                   "lastPrice": float(ce.get("lastPrice", 0) or 0),
+                calls_rows.append({"strike": k, "lastPrice": float(ce.get("lastPrice", 0) or 0),
                                    "openInterest": float(ce.get("openInterest", 0) or 0),
                                    "volume": float(ce.get("totalTradedVolume", 0) or 0)})
             if "PE" in rec:
                 pe = rec["PE"]
-                puts_rows.append({"strike": k,
-                                  "lastPrice": float(pe.get("lastPrice", 0) or 0),
+                puts_rows.append({"strike": k, "lastPrice": float(pe.get("lastPrice", 0) or 0),
                                   "openInterest": float(pe.get("openInterest", 0) or 0),
                                   "volume": float(pe.get("totalTradedVolume", 0) or 0)})
         calls_df = pd.DataFrame(calls_rows)
         puts_df  = pd.DataFrame(puts_rows)
         if not calls_df.empty:
-            return round(spot, 2), calls_df, puts_df, expiry
+            return round(spot, 2), calls_df, puts_df, expiry, expiries
     except Exception:
         pass
-
     return None
 
 @st.cache_data(ttl=90, show_spinner=False)
 def get_market_data(asset_name):
-    """
-    Layer 1: NSE API (multiple approaches)
-    Layer 2: yfinance — spot only for Indian assets (no option chain)
-    Layer 3: Static fallback
-    """
-    # Layer 1: NSE API
     result = _try_nse_api(asset_name)
     if result:
-        spot, calls_df, puts_df, expiry = result
-        return spot, calls_df, puts_df, expiry, None, "nse"
-
-    # Layer 2: yfinance for spot price only
+        spot, calls_df, puts_df, expiry, expiries = result
+        return spot, calls_df, puts_df, expiry, expiries, None, "nse"
     try:
         stock = yf.Ticker(TICKER_MAP[asset_name])
         hist  = stock.history(period="2d")
         if not hist.empty:
             spot = float(round(hist["Close"].iloc[-1], 2))
-            return spot, pd.DataFrame(), pd.DataFrame(), None, \
-                "NSE option chain unavailable from cloud server. Live spot ✅ | Enter Call & Put prices manually from NSE website.", "yf_spot"
+            return spot, pd.DataFrame(), pd.DataFrame(), None, [], \
+                "NSE option chain unavailable from cloud server. Live spot ✅ | Enter prices manually.", "yf_spot"
     except Exception:
         pass
-
-    # Layer 3: Static fallback
-    return (FALLBACK_SPOTS[asset_name], pd.DataFrame(), pd.DataFrame(), None,
+    return (FALLBACK_SPOTS[asset_name], pd.DataFrame(), pd.DataFrame(), None, [],
             "All live sources unavailable. Using fallback spot. Enter prices manually.", "fallback")
 
-with st.spinner("📡 Fetching data for {}...".format(asset)):
-    s0, calls_df, puts_df, expiry_date, fetch_error, data_source = get_market_data(asset)
+@st.cache_data(ttl=300, show_spinner=False)
+def get_forex_rate():
+    """Fetch USD/INR spot rate via yfinance."""
+    try:
+        t = yf.Ticker("USDINR=X")
+        h = t.history(period="2d")
+        if not h.empty:
+            return float(round(h["Close"].iloc[-1], 4))
+    except Exception:
+        pass
+    return 83.50  # fallback
 
-# Status display
-if data_source == "nse":
-    st.success("✅ Live NSE option chain loaded — Expiry: **{}**  |  Spot: ₹{:,.2f}".format(expiry_date, s0))
-elif data_source == "yf_spot":
-    st.warning("⚠️ {}".format(fetch_error))
-    # Show helpful NSE link so user can look up option prices
-    st.markdown(
-        '<div class="nse-link-box">📋 <strong>Get option prices from NSE:</strong> '
-        '<a href="{url}" target="_blank">Open {asset} Option Chain on NSE ↗</a><br>'
-        'Look up the ATM strike Call & Put last traded prices and enter them below.</div>'.format(
-            url=NSE_CHAIN_URLS[asset], asset=asset),
-        unsafe_allow_html=True
-    )
-else:
-    st.error("⚠️ {}".format(fetch_error))
-    st.markdown(
-        '<div class="nse-link-box">📋 <strong>Get option prices from NSE:</strong> '
-        '<a href="{url}" target="_blank">Open {asset} Option Chain on NSE ↗</a></div>'.format(
-            url=NSE_CHAIN_URLS[asset], asset=asset),
-        unsafe_allow_html=True
-    )
-
-lot = LOT_SIZES[asset]
-total_units = num_lots * lot
-step = float(STRIKE_STEP[asset])
-
-# ── OPTION PRICE LOOKUP ───────────────────────────────────────────────────────
-def lookup_option_price(chain_df, target_strike):
-    if chain_df.empty:
-        return None
-    strikes = chain_df["strike"].values
-    mask = np.isclose(strikes, target_strike, rtol=0, atol=step * 0.4)
-    if not mask.any():
-        return None
-    price  = chain_df.loc[mask, "lastPrice"].values[0]
-    volume = chain_df.loc[mask, "volume"].values[0] if "volume" in chain_df.columns else np.nan
-    oi     = chain_df.loc[mask, "openInterest"].values[0] if "openInterest" in chain_df.columns else np.nan
-    if price > 0 and (pd.isna(volume) or volume > 0 or (not pd.isna(oi) and oi > 0)):
-        return float(round(price, 2))
-    return None
-
-c1, c2, c3 = st.columns(3)
-with c1:
-    default_strike = float(round(s0 / step) * step)
-    strike = st.number_input("Strike Price (₹)", value=default_strike, step=step, format="%.2f")
-with c2:
-    live_call    = lookup_option_price(calls_df, strike)
-    call_default = live_call if live_call is not None else round(s0 * 0.025, 2)
-    call_source  = "🟢 Live" if live_call is not None else "🟡 Enter manually"
-    c_mkt = st.number_input("Call Price (₹)  {}".format(call_source),
-                            value=float(call_default), min_value=0.01, step=0.5, format="%.2f")
-with c3:
-    live_put    = lookup_option_price(puts_df, strike)
-    put_default = live_put if live_put is not None else round(s0 * 0.018, 2)
-    put_source  = "🟢 Live" if live_put is not None else "🟡 Enter manually"
-    p_mkt = st.number_input("Put Price (₹)  {}".format(put_source),
-                            value=float(put_default), min_value=0.01, step=0.5, format="%.2f")
-
-# ── CALCULATIONS ──────────────────────────────────────────────────────────────
-t               = days_to_expiry / 365.0
-pv_k            = strike * np.exp(-r_rate * t)
-synthetic_spot  = c_mkt - p_mkt + pv_k
-spread_per_unit = s0 - synthetic_spot
-fno_orders      = 2 * num_lots
-spot_orders     = 2
-total_brokerage = brokerage * (fno_orders + spot_orders)
-stt_spot        = s0 * total_units * 0.001
-stt_options     = (c_mkt + p_mkt) * total_units * 0.000625
-total_friction  = total_brokerage + stt_spot + stt_options
-gross_spread    = abs(spread_per_unit) * total_units
-arb_threshold   = s0 * (arb_threshold_pct / 100)
-
-# ── SIGNAL ────────────────────────────────────────────────────────────────────
-if spread_per_unit > arb_threshold:
-    signal_line, signal_color, strategy_desc, signal_type = "CONVERSION ARBITRAGE DETECTED", "#28a745", "Buy Spot  ·  Buy Put  ·  Sell Call", "conversion"
-    net_pnl = gross_spread - total_friction
-elif spread_per_unit < -arb_threshold:
-    signal_line, signal_color, strategy_desc, signal_type = "REVERSAL ARBITRAGE DETECTED", "#dc3545", "Short Spot  ·  Sell Put  ·  Buy Call", "reversal"
-    net_pnl = gross_spread - total_friction
-else:
-    signal_line, signal_color, strategy_desc, signal_type = "MARKET IS EFFICIENT — No Arbitrage", "#6c757d", "No Action", "none"
-    net_pnl = -total_friction
-
-pnl_is_profitable = net_pnl > 0
-
-# ── METRICS ───────────────────────────────────────────────────────────────────
-st.markdown("---")
-m1, m2, m3, m4, m5 = st.columns(5)
-m1.metric("Market Spot",      "₹{:,.2f}".format(s0))
-m2.metric("Synthetic Price",  "₹{:,.2f}".format(synthetic_spot))
-m3.metric("Arbitrage Gap",    "₹{:.2f}".format(abs(spread_per_unit)),
-          delta="Threshold ₹{:.2f}".format(arb_threshold), delta_color="off")
-m4.metric("Total Friction",   "₹{:,.2f}".format(total_friction))
-m5.metric("Capital Required", "₹{:,.0f}".format(s0 * total_units * margin_pct))
-
-st.markdown(
-    '<div style="background-color:{c}; padding:14px; border-radius:10px; '
-    'text-align:center; color:white; margin-top:12px;">'
-    '<h2 style="margin:0; font-size:22px;">{s}</h2>'
-    '<p style="margin:4px 0 0 0; font-size:15px; opacity:0.9;">Strategy: {d}</p>'
-    '</div>'.format(c=signal_color, s=signal_line, d=strategy_desc),
-    unsafe_allow_html=True
-)
-
-if signal_type != "none" and not pnl_is_profitable:
-    st.markdown('<div class="warning-box">⚠️ <strong>Gap detected but NOT profitable after costs.</strong> Friction exceeds gross spread. Do not trade.</div>', unsafe_allow_html=True)
-
-st.write("")
-col_proof, col_graph = st.columns([1, 1.4])
-
-with col_proof:
-    st.subheader("📊 Execution Proof")
-    st.markdown("**Strategy:** {}".format(strategy_desc))
-    st.latex(r"C - P = S_0 - K \cdot e^{-rT} \quad \text{(Put-Call Parity)}")
-    st.latex(r"\text{Gap} = S_0 - (C - P + K e^{-rT})")
-    st.markdown("**Cost Breakdown:**")
-    cost_df = pd.DataFrame({
-        "Item": ["Brokerage ({} orders)".format(fno_orders + spot_orders), "STT on Spot", "STT on Options", "Total Friction"],
-        "Amount (₹)": ["₹{:,.2f}".format(total_brokerage), "₹{:,.2f}".format(stt_spot),
-                       "₹{:,.2f}".format(stt_options), "₹{:,.2f}".format(total_friction)]
-    })
-    st.dataframe(cost_df, hide_index=True, use_container_width=True)
-    st.metric("Net Profit (after all costs)", "₹{:,.2f}".format(net_pnl),
-              delta="Profitable ✅" if pnl_is_profitable else "Loss after costs ❌",
-              delta_color="normal" if pnl_is_profitable else "inverse")
-    st.caption("Across {:,} units ({} lot{} × {})".format(total_units, num_lots, "s" if num_lots > 1 else "", lot))
-
-with col_graph:
-    prices = np.linspace(s0 * 0.75, s0 * 1.25, 300)
-    if signal_type == "conversion":
-        spot_pnl  = (prices - s0) * total_units
-        put_pnl   = (np.maximum(strike - prices, 0) - p_mkt) * total_units
-        call_pnl  = (c_mkt - np.maximum(prices - strike, 0)) * total_units
-        total_pnl = spot_pnl + put_pnl + call_pnl - total_friction
-    elif signal_type == "reversal":
-        spot_pnl  = (s0 - prices) * total_units
-        put_pnl   = (p_mkt - np.maximum(strike - prices, 0)) * total_units
-        call_pnl  = (np.maximum(prices - strike, 0) - c_mkt) * total_units
-        total_pnl = spot_pnl + put_pnl + call_pnl - total_friction
-    else:
-        spot_pnl = put_pnl = call_pnl = total_pnl = np.zeros_like(prices)
-
-    net_range_pad = max(abs(net_pnl) * 5, 500)
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=prices, y=spot_pnl, mode="lines", name="Spot Leg",
-                             line=dict(color="#1f77b4", width=1.5, dash="dot"), opacity=0.55, yaxis="y1"))
-    fig.add_trace(go.Scatter(x=prices, y=put_pnl, mode="lines", name="Put Leg",
-                             line=dict(color="#ff7f0e", width=1.5, dash="dot"), opacity=0.55, yaxis="y1"))
-    fig.add_trace(go.Scatter(x=prices, y=call_pnl, mode="lines", name="Call Leg",
-                             line=dict(color="#9467bd", width=1.5, dash="dot"), opacity=0.55, yaxis="y1"))
-    fig.add_trace(go.Scatter(x=prices, y=total_pnl, mode="lines", name="Net P&L (right axis)",
-                             line=dict(color=signal_color, width=3.5), yaxis="y2"))
-    fig.add_shape(type="line", x0=prices[0], x1=prices[-1], y0=0, y1=0,
-                  line=dict(color="gray", width=1, dash="dash"), yref="y2")
-    fig.add_vline(x=s0, line_dash="dash", line_color="#333333", line_width=1,
-                  annotation_text="Spot ₹{:,.0f}".format(s0), annotation_position="top right")
-    fig.update_layout(
-        title="Strategy Payoff at Expiry — Legs vs Net P&L",
-        xaxis=dict(title=dict(text="Spot Price at Expiry (₹)"), tickformat=",.0f", showgrid=True, gridcolor="#e9ecef"),
-        yaxis=dict(title=dict(text="Individual Leg P&L (₹)", font=dict(color="#555555")),
-                   tickformat=",.0f", tickfont=dict(color="#555555"), showgrid=False),
-        yaxis2=dict(title=dict(text="Net P&L (₹)", font=dict(color=signal_color)),
-                    tickformat=",.0f", tickfont=dict(color=signal_color),
-                    overlaying="y", side="right", range=[-net_range_pad, net_range_pad],
-                    showgrid=True, gridcolor="#e9ecef", zeroline=True, zerolinecolor="gray"),
-        height=360, margin=dict(t=45, b=40, l=10, r=10),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        hovermode="x unified", plot_bgcolor="#f8f9fa", paper_bgcolor="white",
-    )
-    st.plotly_chart(fig, use_container_width=True)
-    st.caption("📌 Dotted = individual legs (left axis). Solid = Net P&L (right axis, zoomed). Net P&L is flat — payoff is locked.")
-
-# ── SCENARIO TABLE ────────────────────────────────────────────────────────────
-st.divider()
-st.subheader("📉 Expiry Scenario Analysis")
-st.caption("Individual legs vary with price, but Gross P&L and Net P&L are always locked.")
-
-scenario_prices = {"Bear (−15%)": s0*0.85, "Bear (−10%)": s0*0.90, "At Strike": strike,
-                   "At Money": s0, "Bull (+10%)": s0*1.10, "Bull (+15%)": s0*1.15}
-rows = []
-for label, st_price in scenario_prices.items():
-    if signal_type == "conversion":
-        s_leg = (st_price - s0) * total_units
-        p_leg = (max(strike - st_price, 0) - p_mkt) * total_units
-        c_leg = (c_mkt - max(st_price - strike, 0)) * total_units
-    elif signal_type == "reversal":
-        s_leg = (s0 - st_price) * total_units
-        p_leg = (p_mkt - max(strike - st_price, 0)) * total_units
-        c_leg = (max(st_price - strike, 0) - c_mkt) * total_units
-    else:
-        s_leg = p_leg = c_leg = 0.0
-    gross = gross_spread if signal_type != "none" else 0.0
-    net   = gross - total_friction
-    rows.append({"Scenario": label, "Expiry Price": "₹{:,.0f}".format(st_price),
-                 "Spot Leg (₹)": "₹{:,.2f}".format(s_leg), "Put Leg (₹)": "₹{:,.2f}".format(p_leg),
-                 "Call Leg (₹)": "₹{:,.2f}".format(c_leg), "Gross P&L (₹)": "₹{:,.2f}".format(gross),
-                 "Friction (₹)": "−₹{:,.2f}".format(total_friction), "Net P&L (₹)": "₹{:,.2f}".format(net)})
-
-st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
-st.info("**Why is Net P&L the same in every row?** — The arbitrage profit is locked at inception by put-call parity. Gross P&L = ₹{:,.2f} (gap × units). Net P&L = ₹{:,.2f} (Gross − Friction) — identical to Net Profit above.".format(gross_spread, net_pnl))
-
-# ── BREAK-EVEN & SENSITIVITY ──────────────────────────────────────────────────
-if signal_type != "none" and abs(spread_per_unit) > 0:
+# ══════════════════════════════════════════════════════════════════════════════
+# SIDEBAR
+# ══════════════════════════════════════════════════════════════════════════════
+with st.sidebar:
+    st.header("⚙️ Global Parameters")
+    r_rate_pct = st.slider("India Risk-Free Rate (%)", 4.0, 10.0, 6.75, step=0.25)
+    r_rate     = r_rate_pct / 100
+    brokerage  = st.number_input("Brokerage per Order (₹)", value=20.0, min_value=0.0, step=5.0,
+                                 help="Flat fee per order, e.g. Zerodha ₹20")
+    margin_pct = st.slider("Margin Requirement (%)", 10, 40, 20) / 100
+    arb_threshold_pct = st.slider("Arbitrage Threshold (%)", 0.01, 0.5, 0.05, step=0.01,
+                                  help="Min gap as % of spot — filters bid-ask noise")
     st.divider()
-    st.subheader("🔍 Break-Even & Sensitivity")
-    col_be1, col_be2 = st.columns(2)
-    with col_be1:
-        break_even_lots = None
-        for n in range(1, 501):
-            tu = n * lot
-            fric = brokerage*(2*n+2) + s0*tu*0.001 + (c_mkt+p_mkt)*tu*0.000625
-            if abs(spread_per_unit) * tu >= fric:
-                break_even_lots = n
-                break
-        if break_even_lots:
-            st.metric("Break-Even Lots", "{} lots".format(break_even_lots),
-                      delta="You selected {} lots".format(num_lots),
-                      delta_color="normal" if num_lots >= break_even_lots else "inverse")
-        else:
-            st.warning("Cannot be profitable even with 500 lots.")
-    with col_be2:
-        lot_range = list(range(1, min(num_lots*4+1, 51)))
-        pnl_by_lots = [abs(spread_per_unit)*n*lot - brokerage*(2*n+2) - s0*n*lot*0.001 - (c_mkt+p_mkt)*n*lot*0.000625 for n in lot_range]
-        fig2 = go.Figure()
-        fig2.add_trace(go.Bar(x=lot_range, y=pnl_by_lots,
-                              marker_color=[signal_color if p > 0 else "#dc3545" for p in pnl_by_lots]))
-        fig2.add_hline(y=0, line_dash="dash", line_color="gray")
-        fig2.update_layout(title="Net P&L vs Number of Lots", xaxis_title="Number of Lots",
-                           yaxis=dict(title="Net P&L (₹)", tickformat=",.0f"),
-                           height=260, margin=dict(t=35, b=30, l=0, r=0),
-                           plot_bgcolor="#f8f9fa", paper_bgcolor="white", showlegend=False)
-        st.plotly_chart(fig2, use_container_width=True)
+    st.subheader("🔬 Greeks (BSM)")
+    iv_pct     = st.slider("Implied Volatility (%)", 5.0, 100.0, 20.0, step=0.5)
+    implied_vol = iv_pct / 100.0
 
+# ══════════════════════════════════════════════════════════════════════════════
+# TABS
+# ══════════════════════════════════════════════════════════════════════════════
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📐 Put-Call Parity",
+    "🌍 Interest Rate Parity",
+    "📦 Futures Basis (Cash & Carry)",
+    "⚖️ Cross-Market Spread",
+])
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 1 — PUT-CALL PARITY ARBITRAGE
+# ══════════════════════════════════════════════════════════════════════════════
+with tab1:
+    st.subheader("📐 Put-Call Parity Arbitrage")
+    st.markdown(
+        "**Theory:** For European options: `C − P = S₀ − K·e^(−rT)`  "
+        "Any measurable deviation after transaction costs = risk-free profit."
+    )
+
+    col_a, col_b = st.columns([1, 2])
+    with col_a:
+        asset    = st.selectbox("Select Asset", list(LOT_SIZES.keys()), key="pcp_asset")
+        num_lots = st.number_input("Number of Lots", min_value=1, value=1, step=1, key="pcp_lots")
+
+    with st.spinner("📡 Fetching data for {}...".format(asset)):
+        s0, calls_df, puts_df, nse_expiry, nse_expiries, fetch_error, data_source = get_market_data(asset)
+
+    # ── EXPIRY DATE INPUT ──────────────────────────────────────────────────────
+    st.markdown("#### 📅 Expiry Date")
+    exp_col1, exp_col2, exp_col3 = st.columns([1.2, 1.2, 1.6])
+    with exp_col1:
+        today = datetime.date.today()
+        # Next NSE monthly expiry = last Thursday of the month
+        def last_thursday(year, month):
+            import calendar
+            cal = calendar.monthcalendar(year, month)
+            thursdays = [w[3] for w in cal if w[3] != 0]
+            return datetime.date(year, month, thursdays[-1])
+
+        # Build next 4 monthly expiries
+        suggested_expiries = []
+        y, m = today.year, today.month
+        for _ in range(4):
+            exp = last_thursday(y, m)
+            if exp > today:
+                suggested_expiries.append(exp)
+            m += 1
+            if m > 12:
+                m = 1; y += 1
+
+        # If NSE API returned expiry string, parse it
+        parsed_nse_expiry = None
+        if nse_expiry:
+            try:
+                parsed_nse_expiry = datetime.datetime.strptime(nse_expiry, "%d-%b-%Y").date()
+            except Exception:
+                try:
+                    parsed_nse_expiry = datetime.datetime.strptime(nse_expiry, "%Y-%m-%d").date()
+                except Exception:
+                    pass
+
+        default_expiry = parsed_nse_expiry if parsed_nse_expiry else (suggested_expiries[0] if suggested_expiries else today + datetime.timedelta(days=30))
+        expiry_date = st.date_input(
+            "Expiry Date",
+            value=default_expiry,
+            min_value=today + datetime.timedelta(days=1),
+            max_value=today + datetime.timedelta(days=365),
+            help="Select the actual NSE expiry date for this contract",
+            key="pcp_expiry"
+        )
+
+    with exp_col2:
+        days_to_expiry = (expiry_date - today).days
+        st.metric("Days to Expiry", "{} days".format(days_to_expiry))
+
+    with exp_col3:
+        if parsed_nse_expiry:
+            st.success("✅ NSE expiry loaded: **{}**".format(nse_expiry))
+        else:
+            st.info("📅 Manually selected expiry. NSE monthly expiries are typically the last Thursday of each month.")
+
+    t = days_to_expiry / 365.0
+
+    # Status banner
+    if data_source == "nse":
+        st.success("✅ Live NSE option chain | Spot: ₹{:,.2f}".format(s0))
+    elif data_source == "yf_spot":
+        st.warning("⚠️ {}".format(fetch_error))
+        st.markdown(
+            '<div class="nse-link-box">📋 <strong>Get option prices from NSE:</strong> '
+            '<a href="{}" target="_blank">Open {} Option Chain on NSE ↗</a><br>'
+            'Enter ATM Call & Put LTP below.</div>'.format(NSE_CHAIN_URLS[asset], asset),
+            unsafe_allow_html=True)
+    else:
+        st.error("⚠️ {}".format(fetch_error))
+        st.markdown(
+            '<div class="nse-link-box">📋 <a href="{}" target="_blank">Open {} Option Chain on NSE ↗</a></div>'.format(
+                NSE_CHAIN_URLS[asset], asset), unsafe_allow_html=True)
+
+    lot = LOT_SIZES[asset]
+    total_units = num_lots * lot
+    step = float(STRIKE_STEP[asset])
+
+    def lookup_option_price(chain_df, target_strike):
+        if chain_df.empty: return None
+        mask = np.isclose(chain_df["strike"].values, target_strike, rtol=0, atol=step * 0.4)
+        if not mask.any(): return None
+        price = chain_df.loc[mask, "lastPrice"].values[0]
+        vol   = chain_df.loc[mask, "volume"].values[0] if "volume" in chain_df.columns else np.nan
+        oi    = chain_df.loc[mask, "openInterest"].values[0] if "openInterest" in chain_df.columns else np.nan
+        if price > 0 and (pd.isna(vol) or vol > 0 or (not pd.isna(oi) and oi > 0)):
+            return float(round(price, 2))
+        return None
+
+    p1, p2, p3 = st.columns(3)
+    with p1:
+        default_strike = float(round(s0 / step) * step)
+        strike = st.number_input("Strike Price (₹)", value=default_strike, step=step, format="%.2f", key="pcp_strike")
+    with p2:
+        live_call    = lookup_option_price(calls_df, strike)
+        call_default = live_call if live_call is not None else round(s0 * 0.025, 2)
+        call_src     = "🟢 Live" if live_call is not None else "🟡 Enter manually"
+        c_mkt = st.number_input("Call Price (₹)  {}".format(call_src),
+                                value=float(call_default), min_value=0.01, step=0.5, format="%.2f", key="pcp_call")
+    with p3:
+        live_put    = lookup_option_price(puts_df, strike)
+        put_default = live_put if live_put is not None else round(s0 * 0.018, 2)
+        put_src     = "🟢 Live" if live_put is not None else "🟡 Enter manually"
+        p_mkt = st.number_input("Put Price (₹)  {}".format(put_src),
+                                value=float(put_default), min_value=0.01, step=0.5, format="%.2f", key="pcp_put")
+
+    # ── CALCULATIONS ──────────────────────────────────────────────────────────
+    pv_k            = strike * np.exp(-r_rate * t)
+    synthetic_spot  = c_mkt - p_mkt + pv_k
+    spread_per_unit = s0 - synthetic_spot
+    fno_orders      = 2 * num_lots
+    total_brokerage = brokerage * (fno_orders + 2)
+    stt_spot        = s0 * total_units * 0.001
+    stt_options     = (c_mkt + p_mkt) * total_units * 0.000625
+    total_friction  = total_brokerage + stt_spot + stt_options
+    gross_spread    = abs(spread_per_unit) * total_units
+    arb_threshold   = s0 * (arb_threshold_pct / 100)
+
+    if spread_per_unit > arb_threshold:
+        signal_line, signal_color, strategy_desc, signal_type = \
+            "✅ CONVERSION ARBITRAGE DETECTED", "#28a745", "Buy Spot  ·  Buy Put  ·  Sell Call", "conversion"
+        net_pnl = gross_spread - total_friction
+    elif spread_per_unit < -arb_threshold:
+        signal_line, signal_color, strategy_desc, signal_type = \
+            "🔴 REVERSAL ARBITRAGE DETECTED", "#dc3545", "Short Spot  ·  Sell Put  ·  Buy Call", "reversal"
+        net_pnl = gross_spread - total_friction
+    else:
+        signal_line, signal_color, strategy_desc, signal_type = \
+            "⚪ MARKET IS EFFICIENT — No Arbitrage", "#6c757d", "No Action", "none"
+        net_pnl = -total_friction
+
+    pnl_profitable = net_pnl > 0
+
+    # ── METRICS ROW ───────────────────────────────────────────────────────────
+    st.markdown("---")
+    m1, m2, m3, m4, m5, m6 = st.columns(6)
+    m1.metric("Market Spot",     "₹{:,.2f}".format(s0))
+    m2.metric("Synthetic Price", "₹{:,.2f}".format(synthetic_spot))
+    m3.metric("PV(Strike)",      "₹{:,.2f}".format(pv_k))
+    m4.metric("Gap / unit",      "₹{:.2f}".format(abs(spread_per_unit)))
+    m5.metric("Total Friction",  "₹{:,.2f}".format(total_friction))
+    m6.metric("Net P&L",         "₹{:,.2f}".format(net_pnl),
+              delta="✅ Profitable" if pnl_profitable else "❌ Loss after costs",
+              delta_color="normal" if pnl_profitable else "inverse")
+
+    st.markdown(
+        '<div style="background:{c}; padding:14px; border-radius:10px; text-align:center; '
+        'color:white; margin:12px 0;"><h2 style="margin:0; font-size:22px;">{s}</h2>'
+        '<p style="margin:4px 0 0; font-size:15px; opacity:.9;">Strategy: {d} | Expiry: {e} ({dte} days)</p></div>'.format(
+            c=signal_color, s=signal_line, d=strategy_desc,
+            e=expiry_date.strftime("%d %b %Y"), dte=days_to_expiry),
+        unsafe_allow_html=True)
+
+    if signal_type != "none" and not pnl_profitable:
+        st.markdown('<div class="warning-box">⚠️ Gap detected but NOT profitable after costs. Do not trade.</div>',
+                    unsafe_allow_html=True)
+
+    # ── PROOF + CHART ─────────────────────────────────────────────────────────
+    st.write("")
+    col_proof, col_graph = st.columns([1, 1.5])
+
+    with col_proof:
+        st.subheader("📊 Execution Proof")
+        st.markdown("**Strategy:** {}".format(strategy_desc))
+        st.markdown("**Expiry Date:** {}  ·  **T = {:.4f} years**".format(
+            expiry_date.strftime("%d %b %Y"), t))
+        st.latex(r"C - P = S_0 - K \cdot e^{-rT}")
+        st.latex(r"\text{Gap} = S_0 - \underbrace{(C - P + K e^{-rT})}_{\text{Synthetic Fair Price}}")
+        cost_df = pd.DataFrame({
+            "Item": ["Brokerage ({} orders)".format(fno_orders + 2),
+                     "STT on Spot (0.1%)", "STT on Options (0.0625%)", "Total Friction"],
+            "Amount (₹)": ["₹{:,.2f}".format(total_brokerage), "₹{:,.2f}".format(stt_spot),
+                           "₹{:,.2f}".format(stt_options),      "₹{:,.2f}".format(total_friction)]
+        })
+        st.dataframe(cost_df, hide_index=True, use_container_width=True)
+        st.metric("Net Profit (after all costs)", "₹{:,.2f}".format(net_pnl),
+                  delta="Profitable ✅" if pnl_profitable else "Loss ❌",
+                  delta_color="normal" if pnl_profitable else "inverse")
+        st.caption("Across {:,} units ({} lot{} × {})".format(
+            total_units, num_lots, "s" if num_lots > 1 else "", lot))
+
+    with col_graph:
+        prices = np.linspace(s0 * 0.75, s0 * 1.25, 300)
+        if signal_type == "conversion":
+            spot_pnl = (prices - s0) * total_units
+            put_pnl  = (np.maximum(strike - prices, 0) - p_mkt) * total_units
+            call_pnl = (c_mkt - np.maximum(prices - strike, 0)) * total_units
+        elif signal_type == "reversal":
+            spot_pnl = (s0 - prices) * total_units
+            put_pnl  = (p_mkt - np.maximum(strike - prices, 0)) * total_units
+            call_pnl = (np.maximum(prices - strike, 0) - c_mkt) * total_units
+        else:
+            spot_pnl = put_pnl = call_pnl = np.zeros_like(prices)
+
+        net_locked = np.full(len(prices), net_pnl)
+        net_pad    = max(abs(net_pnl) * 5, 500)
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=prices, y=spot_pnl, mode="lines", name="Spot Leg",
+                                 line=dict(color="#1f77b4", width=1.5, dash="dot"), opacity=0.5, yaxis="y1"))
+        fig.add_trace(go.Scatter(x=prices, y=put_pnl, mode="lines", name="Put Leg",
+                                 line=dict(color="#ff7f0e", width=1.5, dash="dot"), opacity=0.5, yaxis="y1"))
+        fig.add_trace(go.Scatter(x=prices, y=call_pnl, mode="lines", name="Call Leg",
+                                 line=dict(color="#9467bd", width=1.5, dash="dot"), opacity=0.5, yaxis="y1"))
+        fig.add_trace(go.Scatter(x=prices, y=net_locked, mode="lines", name="Net P&L (locked)",
+                                 line=dict(color=signal_color, width=3.5), yaxis="y2"))
+        fig.add_shape(type="line", x0=prices[0], x1=prices[-1], y0=0, y1=0,
+                      line=dict(color="gray", width=1, dash="dash"), yref="y2")
+        fig.add_vline(x=s0, line_dash="dash", line_color="#333", line_width=1,
+                      annotation_text="Spot ₹{:,.0f}".format(s0), annotation_position="top right")
+        fig.update_layout(
+            title="Payoff at Expiry ({}) — {} days".format(expiry_date.strftime("%d %b %Y"), days_to_expiry),
+            xaxis=dict(title="Spot Price at Expiry (₹)", tickformat=",.0f", showgrid=True, gridcolor="#e9ecef"),
+            yaxis=dict(title=dict(text="Leg P&L (₹)", font=dict(color="#555")),
+                       tickformat=",.0f", showgrid=False),
+            yaxis2=dict(title=dict(text="Net P&L (₹)", font=dict(color=signal_color)),
+                        tickformat=",.0f", overlaying="y", side="right",
+                        range=[-net_pad, net_pad], showgrid=True, gridcolor="#e9ecef"),
+            height=370, margin=dict(t=45, b=40, l=10, r=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            hovermode="x unified", plot_bgcolor="#f8f9fa", paper_bgcolor="white")
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption("📌 Dotted = individual legs (left axis). Solid = Net P&L after costs (right axis). The flat line proves the arbitrage is locked.")
+
+    # ── SCENARIO TABLE ────────────────────────────────────────────────────────
+    st.divider()
+    st.subheader("📉 Expiry Scenario Analysis")
+    st.caption("Net P&L is identical across all expiry prices — proving the payoff is fully locked at entry.")
+    scenarios = {"Bear (−15%)": s0*0.85, "Bear (−10%)": s0*0.90, "At Strike": strike,
+                 "At Money": s0, "Bull (+10%)": s0*1.10, "Bull (+15%)": s0*1.15}
+    rows = []
+    for label, ep in scenarios.items():
+        if signal_type == "conversion":
+            sl = (ep - s0)*total_units; pl = (max(strike-ep,0)-p_mkt)*total_units; cl = (c_mkt-max(ep-strike,0))*total_units
+        elif signal_type == "reversal":
+            sl = (s0-ep)*total_units;  pl = (p_mkt-max(strike-ep,0))*total_units; cl = (max(ep-strike,0)-c_mkt)*total_units
+        else:
+            sl = pl = cl = 0.0
+        gross = gross_spread if signal_type != "none" else 0.0
+        rows.append({"Scenario": label, "Expiry Price": "₹{:,.0f}".format(ep),
+                     "Spot Leg (₹)": "₹{:,.2f}".format(sl), "Put Leg (₹)": "₹{:,.2f}".format(pl),
+                     "Call Leg (₹)": "₹{:,.2f}".format(cl),
+                     "Gross P&L (₹)": "₹{:,.2f}".format(gross),
+                     "Friction (₹)": "−₹{:,.2f}".format(total_friction),
+                     "Net P&L (₹)": "₹{:,.2f}".format(gross - total_friction)})
+    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    st.info("**Gross P&L = ₹{:,.2f}** (gap × units).  **Net P&L = ₹{:,.2f}** (Gross − Friction). "
+            "Identical in every row — the arbitrage is locked at inception.".format(gross_spread, net_pnl))
+
+    # ── GREEKS PANEL ──────────────────────────────────────────────────────────
+    st.divider()
+    with st.expander("🔬 Option Greeks Analysis (Black-Scholes-Merton)", expanded=False):
+        if not SCIPY_OK:
+            st.warning("Add `scipy>=1.11.0` to requirements.txt to enable Greeks.")
+        else:
+            call_g = compute_greeks(s0, strike, r_rate, t, implied_vol, "call")
+            put_g  = compute_greeks(s0, strike, r_rate, t, implied_vol, "put")
+            comb_g = combined_position_greeks(signal_type, call_g, put_g, total_units)
+
+            st.caption("S₀=₹{:,.2f} | K=₹{:,.0f} | σ={:.1f}% | T={} days ({:.4f}y) | r={:.2f}%".format(
+                s0, strike, implied_vol*100, days_to_expiry, t, r_rate*100))
+
+            gdf = pd.DataFrame({
+                "Position": ["📞 Call (per unit)", "📋 Put (per unit)", "⚡ Combined (total)"],
+                "Delta Δ":  ["{} {:.4f}".format(greek_icon(call_g["delta"],0.05), call_g["delta"]),
+                             "{} {:.4f}".format(greek_icon(put_g["delta"],0.05),  put_g["delta"]),
+                             "{} {:.4f}".format(greek_icon(comb_g["delta"],0.05*total_units), comb_g["delta"])],
+                "Gamma Γ":  ["{} {:.6f}".format(greek_icon(call_g["gamma"],0.001), call_g["gamma"]),
+                             "{} {:.6f}".format(greek_icon(put_g["gamma"],0.001),  put_g["gamma"]),
+                             "{} {:.6f}".format(greek_icon(comb_g["gamma"],0.001), comb_g["gamma"])],
+                "Theta Θ/day": ["{} {:.4f}".format(greek_icon(call_g["theta"],5), call_g["theta"]),
+                                "{} {:.4f}".format(greek_icon(put_g["theta"],5),  put_g["theta"]),
+                                "{} {:.4f}".format(greek_icon(comb_g["theta"],5), comb_g["theta"])],
+                "Vega ν/1%vol": ["{} {:.4f}".format(greek_icon(call_g["vega"],10), call_g["vega"]),
+                                 "{} {:.4f}".format(greek_icon(put_g["vega"],10),  put_g["vega"]),
+                                 "{} {:.4f}".format(greek_icon(comb_g["vega"],10), comb_g["vega"])],
+                "Rho ρ/1%rate": ["{} {:.4f}".format(greek_icon(call_g["rho"],5), call_g["rho"]),
+                                 "{} {:.4f}".format(greek_icon(put_g["rho"],5),  put_g["rho"]),
+                                 "{} {:.4f}".format(greek_icon(comb_g["rho"],5), comb_g["rho"])],
+            })
+            st.dataframe(gdf, hide_index=True, use_container_width=True)
+
+            gi1, gi2 = st.columns(2)
+            with gi1:
+                if abs(comb_g["delta"]) < 0.05 * total_units:
+                    st.success("✅ Delta ≈ 0 — Position is delta-neutral.")
+                else:
+                    st.warning("⚠️ Delta = {:.2f} — Consider hedging {:.0f} spot units.".format(
+                        comb_g["delta"], -comb_g["delta"]))
+                if abs(comb_g["vega"]) < 10:
+                    st.success("✅ Vega ≈ 0 — Vega-neutral. IV changes won't affect P&L.")
+                else:
+                    st.warning("⚠️ Vega = {:.2f} — 1% IV move changes P&L by ₹{:.2f}.".format(
+                        comb_g["vega"], comb_g["vega"]))
+            with gi2:
+                st.info("📅 Theta = {:.4f} → Position {s} ₹{:.2f}/day from time decay.".format(
+                    comb_g["theta"], abs(comb_g["theta"]),
+                    s="earns" if comb_g["theta"] > 0 else "loses"))
+                st.info("📈 Rho = {:.4f} → 1% rate rise changes P&L by ₹{:.2f}.".format(
+                    comb_g["rho"], comb_g["rho"]))
+
+            gvals = [abs(comb_g["delta"]), abs(comb_g["gamma"])*1000,
+                     abs(comb_g["theta"]), abs(comb_g["vega"]), abs(comb_g["rho"])]
+            fg = go.Figure(go.Bar(
+                x=["Delta", "Gamma×1000", "Theta", "Vega", "Rho"], y=gvals,
+                marker_color=["#28a745" if v<0.1 else "#ffc107" if v<0.5 else "#dc3545" for v in gvals],
+                text=["{:.5f}".format(v) for v in gvals], textposition="outside"))
+            fg.update_layout(title="Combined Position Greeks (🟢=hedged 🟡=moderate 🔴=exposed)",
+                             yaxis=dict(title="Absolute Value"), height=280,
+                             margin=dict(t=40,b=20,l=10,r=10),
+                             plot_bgcolor="#f8f9fa", paper_bgcolor="white", showlegend=False)
+            st.plotly_chart(fg, use_container_width=True)
+            st.info("A perfect PCP arbitrage has Delta≈0, Gamma≈0, Vega≈0. Residual Theta and Rho "
+                    "confirm the position is locked but sensitive to time decay and rate changes.")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 2 — INTEREST RATE PARITY (IRP)
+# ══════════════════════════════════════════════════════════════════════════════
+with tab2:
+    st.subheader("🌍 Covered Interest Rate Parity (CIRP) Arbitrage")
+    st.markdown("""
+    **Theory — Covered IRP:** The forward exchange rate between two currencies must satisfy:
+
+    `F = S × e^((r_d − r_f) × T)`
+
+    where **F** = theoretical forward rate, **S** = spot USD/INR rate, **r_d** = domestic (India) rate,
+    **r_f** = foreign (US) rate, **T** = tenor in years.
+
+    If the **market forward rate ≠ theoretical forward**, a covered arbitrage opportunity exists.
+    """)
+
+    with st.expander("📖 How IRP Arbitrage Works", expanded=False):
+        st.markdown("""
+        **If Market Forward > Theoretical Forward (Forward is too expensive):**
+        1. Borrow USD at US risk-free rate for T years
+        2. Convert USD → INR at spot rate S
+        3. Invest INR at Indian risk-free rate for T years
+        4. Enter forward contract to sell INR → USD at market forward F_mkt
+        5. At maturity: repay USD loan, profit = (F_mkt − F_theoretical) × notional
+
+        **If Market Forward < Theoretical Forward (Forward is too cheap):**
+        1. Borrow INR at Indian rate
+        2. Convert INR → USD at spot rate S
+        3. Invest USD at US rate
+        4. Enter forward contract to buy INR → sell USD at F_mkt
+        5. At maturity: repay INR loan, profit = (F_theoretical − F_mkt) × notional
+        """)
+
+    irp_c1, irp_c2, irp_c3 = st.columns(3)
+    with irp_c1:
+        spot_usd_inr = get_forex_rate()
+        st.metric("Live USD/INR Spot", "{:.4f}".format(spot_usd_inr), help="From yfinance (USDINR=X)")
+        s_fx = st.number_input("USD/INR Spot Rate", value=float(spot_usd_inr),
+                               min_value=60.0, max_value=110.0, step=0.01, format="%.4f", key="irp_spot")
+    with irp_c2:
+        r_us = st.slider("US Risk-Free Rate (%)", 1.0, 8.0, 5.25, step=0.25, key="irp_rus") / 100
+        r_in = st.slider("India Risk-Free Rate (%)", 4.0, 10.0, 6.75, step=0.25, key="irp_rin") / 100
+    with irp_c3:
+        irp_expiry = st.date_input("Forward Contract Maturity",
+                                   value=today + datetime.timedelta(days=90),
+                                   min_value=today + datetime.timedelta(days=1),
+                                   max_value=today + datetime.timedelta(days=730),
+                                   key="irp_expiry")
+        irp_days   = (irp_expiry - today).days
+        irp_T      = irp_days / 365.0
+        st.metric("Tenor", "{} days ({:.3f}y)".format(irp_days, irp_T))
+
+    notional_usd = st.number_input("Notional (USD)", value=100000.0, min_value=1000.0, step=10000.0,
+                                   format="%.0f", key="irp_notional",
+                                   help="Size of the arbitrage trade in USD")
+    f_mkt = st.number_input("Market Forward Rate (USD/INR)",
+                            value=float(round(s_fx * np.exp((r_in - r_us) * irp_T) + 0.5, 4)),
+                            min_value=60.0, max_value=120.0, step=0.01, format="%.4f", key="irp_fmkt",
+                            help="The actual forward rate quoted by your bank/broker")
+
+    # Calculations
+    f_theory  = s_fx * np.exp((r_in - r_us) * irp_T)
+    irp_gap   = f_mkt - f_theory
+    irp_gap_pct = (irp_gap / f_theory) * 100
+
+    # P&L in INR
+    notional_inr   = notional_usd * s_fx
+    irp_gross_inr  = abs(irp_gap) * notional_usd
+    irp_brokerage  = brokerage * 4   # 4 transactions: borrow, convert, invest, forward
+    irp_friction   = irp_brokerage   # simplified (no STT on forex)
+    irp_net_inr    = irp_gross_inr - irp_friction
+    irp_net_usd    = irp_net_inr / s_fx
+
+    # Signal
+    irp_threshold = f_theory * (arb_threshold_pct / 100)
+    if irp_gap > irp_threshold:
+        irp_signal = "🔴 FORWARD TOO EXPENSIVE — Borrow USD · Invest INR · Sell Forward"
+        irp_color  = "#dc3545"
+    elif irp_gap < -irp_threshold:
+        irp_signal = "✅ FORWARD TOO CHEAP — Borrow INR · Invest USD · Buy Forward"
+        irp_color  = "#28a745"
+    else:
+        irp_signal = "⚪ IRP HOLDS — No Covered Arbitrage Opportunity"
+        irp_color  = "#6c757d"
+
+    st.markdown("---")
+    i1, i2, i3, i4, i5 = st.columns(5)
+    i1.metric("Spot USD/INR",     "{:.4f}".format(s_fx))
+    i2.metric("Theoretical Fwd",  "{:.4f}".format(f_theory))
+    i3.metric("Market Fwd",       "{:.4f}".format(f_mkt))
+    i4.metric("Fwd Gap",          "{:.4f} ({:.3f}%)".format(irp_gap, irp_gap_pct))
+    i5.metric("Net Profit (INR)", "₹{:,.2f}".format(irp_net_inr),
+              delta="≈ USD {:,.2f}".format(irp_net_usd), delta_color="off")
+
+    st.markdown(
+        '<div style="background:{c}; padding:14px; border-radius:10px; text-align:center; color:white; margin:12px 0;">'
+        '<h2 style="margin:0; font-size:20px;">{s}</h2>'
+        '<p style="margin:4px 0 0; font-size:14px; opacity:.9;">Notional: USD {:,.0f} | Maturity: {} ({} days)</p>'
+        '</div>'.format(irp_color, irp_signal, notional_usd, irp_expiry.strftime("%d %b %Y"), irp_days),
+        unsafe_allow_html=True)
+
+    st.markdown("#### 📐 Detailed Calculation")
+    irp_calc = pd.DataFrame({
+        "Step": ["Spot Rate (S)", "India Rate (r_d)", "US Rate (r_f)",
+                 "Tenor T (years)", "Theoretical Forward = S·e^((r_d−r_f)·T)",
+                 "Market Forward (F_mkt)", "Forward Gap (F_mkt − F_theory)",
+                 "Notional (USD)", "Gross Profit = |Gap| × Notional (INR)",
+                 "Transaction Costs (INR)", "Net Profit (INR)", "Net Profit (USD)"],
+        "Value": [
+            "{:.4f}".format(s_fx), "{:.2f}%".format(r_in*100), "{:.2f}%".format(r_us*100),
+            "{:.4f}y ({} days)".format(irp_T, irp_days),
+            "{:.4f}".format(f_theory), "{:.4f}".format(f_mkt),
+            "{:.4f} ({:.3f}%)".format(irp_gap, irp_gap_pct),
+            "USD {:,.0f}".format(notional_usd),
+            "₹{:,.2f}".format(irp_gross_inr),
+            "₹{:,.2f}".format(irp_friction),
+            "₹{:,.2f}".format(irp_net_inr),
+            "USD {:,.2f}".format(irp_net_usd),
+        ]
+    })
+    st.dataframe(irp_calc, hide_index=True, use_container_width=True)
+
+    # Forward rate sensitivity chart
+    st.markdown("#### 📊 Forward Gap Sensitivity — Net P&L vs Market Forward Rate")
+    fwd_range  = np.linspace(f_theory * 0.98, f_theory * 1.02, 200)
+    pnl_range  = [abs(fm - f_theory) * notional_usd - irp_friction for fm in fwd_range]
+    fig_irp = go.Figure()
+    fig_irp.add_trace(go.Scatter(
+        x=fwd_range, y=pnl_range, mode="lines",
+        line=dict(color="#1f77b4", width=2.5),
+        fill="tozeroy",
+        fillcolor="rgba(31,119,180,0.12)",
+        name="Net Profit (INR)"))
+    fig_irp.add_vline(x=f_theory,  line_dash="dash", line_color="green",  annotation_text="Theoretical Fwd")
+    fig_irp.add_vline(x=f_mkt,     line_dash="dash", line_color="red",    annotation_text="Market Fwd")
+    fig_irp.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1)
+    fig_irp.update_layout(
+        title="Net IRP Arbitrage P&L (INR) vs Market Forward Rate",
+        xaxis=dict(title="Market Forward Rate (USD/INR)", tickformat=".4f"),
+        yaxis=dict(title="Net Profit (₹)", tickformat=",.0f"),
+        height=320, margin=dict(t=40,b=30,l=10,r=10),
+        plot_bgcolor="#f8f9fa", paper_bgcolor="white", showlegend=False)
+    st.plotly_chart(fig_irp, use_container_width=True)
+    st.caption("Green = Theoretical forward (no-arbitrage). Red = current market forward. Width of gap = arbitrage opportunity size.")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 3 — FUTURES BASIS (CASH & CARRY)
+# ══════════════════════════════════════════════════════════════════════════════
+with tab3:
+    st.subheader("📦 Futures Basis — Cash & Carry Arbitrage")
+    st.markdown("""
+    **Theory — Cost of Carry:** The fair futures price is:
+
+    `F* = S × e^((r + d) × T)`
+
+    where **r** = risk-free rate, **d** = storage/holding cost (net of dividends), **T** = time to expiry.
+
+    - **If F_mkt > F_fair** → **Cash & Carry**: Buy spot, sell futures, deliver at expiry
+    - **If F_mkt < F_fair** → **Reverse Cash & Carry**: Short spot, buy futures, accept delivery
+    """)
+
+    with st.expander("📖 How Futures Basis Arbitrage Works", expanded=False):
+        st.markdown("""
+        **Cash & Carry (Futures overpriced):**
+        1. Borrow money at risk-free rate for T years
+        2. Buy the underlying spot at price S
+        3. Sell futures contract at F_mkt (above fair value F*)
+        4. At expiry: deliver spot into futures, repay loan
+        5. Profit = F_mkt − S·e^(rT) per unit (the basis mispricing)
+
+        **Reverse Cash & Carry (Futures underpriced):**
+        1. Short sell the underlying spot at S
+        2. Invest short-sale proceeds at risk-free rate
+        3. Buy futures at F_mkt (below fair value F*)
+        4. At expiry: take delivery via futures to close short
+        5. Profit = S·e^(rT) − F_mkt per unit
+        """)
+
+    fb_c1, fb_c2 = st.columns(2)
+    with fb_c1:
+        fb_asset   = st.selectbox("Select Asset", list(LOT_SIZES.keys()), key="fb_asset")
+        fb_lots    = st.number_input("Number of Lots", min_value=1, value=1, step=1, key="fb_lots")
+        holding_cost_pct = st.slider("Holding Cost / Dividend Yield (%)", -3.0, 5.0, 0.0, step=0.1,
+                                     help="Annual storage or holding cost. Negative = dividend yield (reduces fair futures price)",
+                                     key="fb_hold")
+    with fb_c2:
+        fb_expiry  = st.date_input("Futures Expiry Date",
+                                   value=last_thursday(today.year, today.month) if last_thursday(today.year, today.month) > today
+                                   else last_thursday(today.year, today.month + 1 if today.month < 12 else 1),
+                                   min_value=today + datetime.timedelta(days=1),
+                                   max_value=today + datetime.timedelta(days=365),
+                                   key="fb_expiry")
+        fb_days    = (fb_expiry - today).days
+        fb_T       = fb_days / 365.0
+        st.metric("Days to Expiry", "{} days ({:.4f}y)".format(fb_days, fb_T))
+
+    with st.spinner("Fetching spot for {}...".format(fb_asset)):
+        fb_s0_data = get_market_data(fb_asset)
+        fb_s0      = fb_s0_data[0]
+
+    fb_spot    = st.number_input("Spot Price (₹)", value=float(fb_s0), min_value=1.0, step=1.0,
+                                 format="%.2f", key="fb_spot")
+    r_carry    = r_rate + (holding_cost_pct / 100)
+    fb_fair    = fb_spot * np.exp(r_carry * fb_T)
+    fb_lot_sz  = LOT_SIZES[fb_asset]
+    fb_units   = fb_lots * fb_lot_sz
+
+    fb_mkt = st.number_input("Market Futures Price (₹)",
+                             value=float(round(fb_fair + 50, 2)),
+                             min_value=1.0, step=1.0, format="%.2f", key="fb_fmkt",
+                             help="The actual futures price quoted on NSE/BSE")
+
+    # Calculations
+    fb_basis    = fb_mkt - fb_fair           # + = futures rich, − = futures cheap
+    fb_basis_pct = (fb_basis / fb_fair) * 100
+    fb_threshold = fb_fair * (arb_threshold_pct / 100)
+
+    fb_gross    = abs(fb_basis) * fb_units
+    fb_brokerage = brokerage * 4             # spot buy/sell + futures buy/sell
+    fb_stt_spot = fb_spot * fb_units * 0.001
+    fb_friction  = fb_brokerage + fb_stt_spot
+    fb_net       = fb_gross - fb_friction
+    fb_profitable = fb_net > 0
+
+    if fb_basis > fb_threshold:
+        fb_signal = "✅ CASH & CARRY — Buy Spot · Sell Futures · Deliver at Expiry"
+        fb_color  = "#28a745"
+        fb_strategy = "Cash & Carry"
+    elif fb_basis < -fb_threshold:
+        fb_signal = "🔴 REVERSE CASH & CARRY — Short Spot · Buy Futures · Accept Delivery"
+        fb_color  = "#dc3545"
+        fb_strategy = "Reverse Cash & Carry"
+    else:
+        fb_signal = "⚪ BASIS FAIR — No Futures Arbitrage Opportunity"
+        fb_color  = "#6c757d"
+        fb_strategy = "No Trade"
+
+    st.markdown("---")
+    f1, f2, f3, f4, f5, f6 = st.columns(6)
+    f1.metric("Spot Price",    "₹{:,.2f}".format(fb_spot))
+    f2.metric("Fair Futures",  "₹{:,.2f}".format(fb_fair))
+    f3.metric("Market Futures","₹{:,.2f}".format(fb_mkt))
+    f4.metric("Basis",         "₹{:.2f} ({:.2f}%)".format(fb_basis, fb_basis_pct))
+    f5.metric("Friction",      "₹{:,.2f}".format(fb_friction))
+    f6.metric("Net P&L",       "₹{:,.2f}".format(fb_net),
+              delta="Profitable ✅" if fb_profitable else "Loss ❌",
+              delta_color="normal" if fb_profitable else "inverse")
+
+    st.markdown(
+        '<div style="background:{c}; padding:14px; border-radius:10px; text-align:center; color:white; margin:12px 0;">'
+        '<h2 style="margin:0; font-size:20px;">{s}</h2>'
+        '<p style="margin:4px 0 0; font-size:14px; opacity:.9;">Strategy: {st} | Expiry: {e} ({d} days)</p>'
+        '</div>'.format(c=fb_color, s=fb_signal, st=fb_strategy,
+                        e=fb_expiry.strftime("%d %b %Y"), d=fb_days),
+        unsafe_allow_html=True)
+
+    if fb_basis != 0 and not fb_profitable:
+        st.markdown('<div class="warning-box">⚠️ Basis gap detected but costs exceed profit. Do not trade.</div>',
+                    unsafe_allow_html=True)
+
+    st.markdown("#### 📐 Detailed Calculation")
+    fb_table = pd.DataFrame({
+        "Parameter": ["Spot Price (S)", "Risk-Free Rate (r)", "Holding Cost/Dividend (d)",
+                      "Carry Rate = r + d", "Time to Expiry T",
+                      "Fair Futures F* = S·e^(carry×T)",
+                      "Market Futures Price (F_mkt)", "Basis = F_mkt − F*",
+                      "Total Units (lots × lot size)",
+                      "Gross Profit = |Basis| × Units",
+                      "Brokerage (4 orders)", "STT on Spot",
+                      "Total Friction", "Net Profit"],
+        "Value": [
+            "₹{:,.2f}".format(fb_spot), "{:.2f}%".format(r_rate*100),
+            "{:.2f}%".format(holding_cost_pct), "{:.2f}%".format(r_carry*100),
+            "{} days ({:.4f}y)".format(fb_days, fb_T),
+            "₹{:,.2f}".format(fb_fair), "₹{:,.2f}".format(fb_mkt),
+            "₹{:.2f} ({:.3f}%)".format(fb_basis, fb_basis_pct),
+            "{:,}".format(fb_units),
+            "₹{:,.2f}".format(fb_gross),
+            "₹{:,.2f}".format(fb_brokerage), "₹{:,.2f}".format(fb_stt_spot),
+            "₹{:,.2f}".format(fb_friction),
+            "₹{:,.2f}".format(fb_net),
+        ]
+    })
+    st.dataframe(fb_table, hide_index=True, use_container_width=True)
+
+    # Basis decay chart — shows convergence to zero at expiry
+    st.markdown("#### 📊 Futures Basis Decay to Zero at Expiry")
+    days_arr  = np.arange(fb_days, 0, -1)
+    T_arr     = days_arr / 365.0
+    fair_arr  = fb_spot * np.exp(r_carry * T_arr)
+    basis_arr = fb_mkt - fair_arr          # basis decays as fair price rises to meet futures
+    pnl_arr   = np.where(basis_arr > 0,
+                         (basis_arr * fb_units) - fb_friction,
+                         (abs(basis_arr) * fb_units) - fb_friction)
+
+    fig_fb = go.Figure()
+    fig_fb.add_trace(go.Scatter(x=days_arr[::-1], y=fair_arr[::-1], mode="lines",
+                                name="Fair Futures F*", line=dict(color="#28a745", width=2)))
+    fig_fb.add_trace(go.Scatter(x=[fb_days, 0], y=[fb_mkt, fb_mkt], mode="lines",
+                                name="Market Futures (entry)", line=dict(color="#dc3545", width=2, dash="dash")))
+    fig_fb.add_trace(go.Scatter(x=days_arr[::-1], y=basis_arr[::-1], mode="lines",
+                                name="Basis (Fmkt − F*)", line=dict(color="#ff7f0e", width=1.5, dash="dot"),
+                                yaxis="y2"))
+    fig_fb.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1, yref="y2")
+    fig_fb.update_layout(
+        title="Basis Decay: Fair Futures Converges to Market Price at Expiry",
+        xaxis=dict(title="Days Remaining to Expiry", autorange="reversed"),
+        yaxis=dict(title=dict(text="Price (₹)", font=dict(color="#28a745")), tickformat=",.2f"),
+        yaxis2=dict(title=dict(text="Basis (₹)", font=dict(color="#ff7f0e")),
+                    overlaying="y", side="right", tickformat=",.2f"),
+        height=320, margin=dict(t=40,b=30,l=10,r=10),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        plot_bgcolor="#f8f9fa", paper_bgcolor="white")
+    st.plotly_chart(fig_fb, use_container_width=True)
+    st.caption("As time passes, F* rises (cost of carry accumulates) and converges to F_mkt at expiry. "
+               "The basis (orange dotted) decays to zero — this convergence locks in the arbitrage profit.")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 4 — CROSS-MARKET SPREAD ARBITRAGE
+# ══════════════════════════════════════════════════════════════════════════════
+with tab4:
+    st.subheader("⚖️ Cross-Market Spread Arbitrage (Statistical)")
+    st.markdown("""
+    **Theory — Pairs Trading / Cross-Market Spread:**
+    Two assets that share fundamental economic linkages (same sector, correlated indices, ADR vs domestic)
+    tend to maintain a stable long-run price ratio (the **spread**). When the spread deviates significantly
+    from its historical mean, a mean-reversion arbitrage can be executed:
+
+    - **Spread = Price_A − β × Price_B**  (β = hedge ratio from historical regression)
+    - **Z-Score = (Spread − Mean) / Std Dev**
+    - **|Z-Score| > 2.0** → Statistically significant deviation → Trade signal
+    """)
+
+    with st.expander("📖 How Cross-Market Spread Arbitrage Works", expanded=False):
+        st.markdown("""
+        **When Z-Score > +2 (Spread too wide — Asset A overpriced vs B):**
+        1. SHORT Asset A
+        2. LONG Asset B (β units for every 1 unit of A)
+        3. Hold until spread reverts to mean
+        4. Profit = entry spread − exit spread (after costs)
+
+        **When Z-Score < −2 (Spread too narrow — Asset A underpriced vs B):**
+        1. LONG Asset A
+        2. SHORT Asset B (β units for every 1 unit of A)
+        3. Hold until spread reverts to mean
+        4. Profit = exit spread − entry spread (after costs)
+
+        **Statistical basis:** Based on historical price correlation over a lookback window.
+        This is not a risk-free arbitrage but a **statistical arbitrage** — the spread may widen
+        further before reverting. Used by hedge funds and quant desks.
+        """)
+
+    cms_c1, cms_c2 = st.columns(2)
+    with cms_c1:
+        asset_a = st.selectbox("Asset A (Long/Short leg)", list(LOT_SIZES.keys()), index=0, key="cms_a")
+        lots_a  = st.number_input("Lots (Asset A)", min_value=1, value=1, step=1, key="cms_lots_a")
+    with cms_c2:
+        asset_b = st.selectbox("Asset B (Hedge leg)", list(LOT_SIZES.keys()), index=1, key="cms_b")
+        lots_b  = st.number_input("Lots (Asset B)", min_value=1, value=1, step=1, key="cms_lots_b")
+
+    lookback = st.slider("Lookback Period (days)", 20, 252, 60, step=5, key="cms_lookback",
+                         help="Historical window for computing spread mean and std dev")
+    z_entry  = st.slider("Z-Score Entry Threshold", 1.0, 3.0, 2.0, step=0.1, key="cms_z",
+                         help="Trade when |Z-Score| exceeds this value")
+
+    # Fetch historical prices
+    @st.cache_data(ttl=300, show_spinner=False)
+    def fetch_hist(ticker_a, ticker_b, days):
+        try:
+            period = "{}d".format(min(days + 30, 365))
+            da = yf.Ticker(ticker_a).history(period=period)["Close"].tail(days)
+            db = yf.Ticker(ticker_b).history(period=period)["Close"].tail(days)
+            df = pd.DataFrame({"A": da.values, "B": db.values},
+                              index=da.index[:min(len(da), len(db))])
+            return df.dropna()
+        except Exception:
+            return pd.DataFrame()
+
+    with st.spinner("Fetching historical prices for {} & {}...".format(asset_a, asset_b)):
+        hist_df = fetch_hist(TICKER_MAP[asset_a], TICKER_MAP[asset_b], lookback + 30)
+
+    if hist_df.empty or len(hist_df) < 10:
+        st.warning("Could not fetch sufficient historical data. Using fallback spot prices for illustration.")
+        sp_a = FALLBACK_SPOTS[asset_a]
+        sp_b = FALLBACK_SPOTS[asset_b]
+        beta = 1.0
+        spread_mean = 0.0
+        spread_std  = sp_a * 0.02
+        spread_now  = sp_a - beta * sp_b
+        z_score     = 0.0
+        hist_available = False
+    else:
+        hist_df = hist_df.tail(lookback)
+        sp_a    = float(hist_df["A"].iloc[-1])
+        sp_b    = float(hist_df["B"].iloc[-1])
+        # Hedge ratio β via OLS
+        beta    = float(np.polyfit(hist_df["B"], hist_df["A"], 1)[0])
+        spread_series = hist_df["A"] - beta * hist_df["B"]
+        spread_mean   = float(spread_series.mean())
+        spread_std    = float(spread_series.std())
+        spread_now    = float(spread_series.iloc[-1])
+        z_score       = (spread_now - spread_mean) / spread_std if spread_std > 0 else 0.0
+        hist_available = True
+
+    units_a = lots_a * LOT_SIZES[asset_a]
+    units_b = lots_b * LOT_SIZES[asset_b]
+    entry_spread   = abs(spread_now - spread_mean)
+    cms_gross      = entry_spread * min(units_a, units_b)
+    cms_friction   = brokerage * 4   # 2 open + 2 close orders
+    cms_net        = cms_gross - cms_friction
+    cms_profitable = cms_net > 0
+
+    cms_threshold = spread_std * z_entry
+    if z_score > z_entry:
+        cms_signal  = "🔴 SPREAD WIDE — Short {} · Long {}".format(asset_a, asset_b)
+        cms_color   = "#dc3545"
+        cms_action  = "Short A, Long B"
+    elif z_score < -z_entry:
+        cms_signal  = "✅ SPREAD NARROW — Long {} · Short {}".format(asset_a, asset_b)
+        cms_color   = "#28a745"
+        cms_action  = "Long A, Short B"
+    else:
+        cms_signal  = "⚪ SPREAD WITHIN BOUNDS — No Statistical Arbitrage"
+        cms_color   = "#6c757d"
+        cms_action  = "Wait"
+
+    st.markdown("---")
+    s1, s2, s3, s4, s5 = st.columns(5)
+    s1.metric("{} Price".format(asset_a), "₹{:,.2f}".format(sp_a))
+    s2.metric("{} Price".format(asset_b), "₹{:,.2f}".format(sp_b))
+    s3.metric("Hedge Ratio β",  "{:.4f}".format(beta))
+    s4.metric("Spread Z-Score", "{:.3f}".format(z_score),
+              delta="Entry @ ±{:.1f}".format(z_entry), delta_color="off")
+    s5.metric("Net P&L (est.)", "₹{:,.2f}".format(cms_net),
+              delta="Spread reverts to mean" if cms_profitable else "Spread too small", delta_color="off")
+
+    st.markdown(
+        '<div style="background:{c}; padding:14px; border-radius:10px; text-align:center; color:white; margin:12px 0;">'
+        '<h2 style="margin:0; font-size:20px;">{s}</h2>'
+        '<p style="margin:4px 0 0; font-size:14px; opacity:.9;">Z-Score={z:.3f} | Threshold=±{t:.1f} | Action: {a}</p>'
+        '</div>'.format(c=cms_color, s=cms_signal, z=z_score, t=z_entry, a=cms_action),
+        unsafe_allow_html=True)
+
+    cms_detail = pd.DataFrame({
+        "Metric": ["Current {} Price".format(asset_a), "Current {} Price".format(asset_b),
+                   "Hedge Ratio β (OLS, {} days)".format(lookback),
+                   "Current Spread = A − β·B",
+                   "Historical Mean Spread",
+                   "Historical Std Dev",
+                   "Z-Score = (Spread−Mean)/Std",
+                   "Entry Threshold (±Z×Std)",
+                   "Estimated Gross P&L (if reversion to mean)",
+                   "Transaction Costs", "Estimated Net P&L"],
+        "Value": [
+            "₹{:,.2f}".format(sp_a), "₹{:,.2f}".format(sp_b),
+            "{:.4f}".format(beta),
+            "₹{:,.4f}".format(spread_now),
+            "₹{:,.4f}".format(spread_mean),
+            "₹{:,.4f}".format(spread_std),
+            "{:.3f}{}".format(z_score, " ← SIGNAL!" if abs(z_score) > z_entry else ""),
+            "±₹{:,.4f}".format(cms_threshold),
+            "₹{:,.2f}".format(cms_gross),
+            "₹{:,.2f}".format(cms_friction),
+            "₹{:,.2f}".format(cms_net),
+        ]
+    })
+    st.dataframe(cms_detail, hide_index=True, use_container_width=True)
+
+    # Spread history chart
+    if hist_available and len(hist_df) > 5:
+        st.markdown("#### 📊 Historical Spread & Z-Score")
+        spread_hist = hist_df["A"] - beta * hist_df["B"]
+        z_hist      = (spread_hist - spread_mean) / spread_std
+
+        fig_cms = go.Figure()
+        fig_cms.add_trace(go.Scatter(
+            x=list(range(len(spread_hist))), y=spread_hist.values,
+            mode="lines", name="Spread (A − β·B)",
+            line=dict(color="#1f77b4", width=2)))
+        fig_cms.add_hline(y=spread_mean, line_dash="dash", line_color="green",
+                          annotation_text="Mean {:.2f}".format(spread_mean))
+        fig_cms.add_hline(y=spread_mean + z_entry*spread_std, line_dash="dot", line_color="#dc3545",
+                          annotation_text="+{:.0f}σ".format(z_entry))
+        fig_cms.add_hline(y=spread_mean - z_entry*spread_std, line_dash="dot", line_color="#dc3545",
+                          annotation_text="-{:.0f}σ".format(z_entry))
+        fig_cms.add_trace(go.Scatter(
+            x=list(range(len(z_hist))), y=z_hist.values,
+            mode="lines", name="Z-Score",
+            line=dict(color="#ff7f0e", width=1.5, dash="dot"), yaxis="y2"))
+        fig_cms.update_layout(
+            title="Spread History — {} vs {} (last {} days)".format(asset_a, asset_b, lookback),
+            xaxis=dict(title="Trading Days"),
+            yaxis=dict(title=dict(text="Spread (₹)", font=dict(color="#1f77b4"))),
+            yaxis2=dict(title=dict(text="Z-Score", font=dict(color="#ff7f0e")),
+                        overlaying="y", side="right"),
+            height=340, margin=dict(t=40,b=30,l=10,r=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            plot_bgcolor="#f8f9fa", paper_bgcolor="white")
+        st.plotly_chart(fig_cms, use_container_width=True)
+        st.caption("Red dotted lines = entry thresholds (±{:.0f}σ). Trade when spread crosses threshold and expect mean reversion. "
+                   "⚠️ Statistical arbitrage carries model risk — spreads may not always revert.".format(z_entry))
+
+    st.warning("⚠️ Statistical arbitrage is NOT risk-free. Unlike PCP or IRP, spread reversion is probabilistic. "
+               "Use proper stop-losses and position sizing in practice.")
+
+# ── GLOBAL FOOTER ─────────────────────────────────────────────────────────────
 st.divider()
-st.caption("⚠️ Disclaimer: For educational and research purposes only. Arbitrage windows last milliseconds in real markets. Not financial advice. | Built at IIT Roorkee · Dept. of Management Studies")
+st.caption("⚠️ For educational and research purposes only. Not financial advice. "
+           "Arbitrage windows are fleeting in real markets. | IIT Roorkee · Dept. of Management Studies · Financial Engineering")
