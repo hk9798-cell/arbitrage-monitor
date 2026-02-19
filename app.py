@@ -291,7 +291,8 @@ if signal_type != "none" and abs(spread_per_unit) > 0:
             st.warning("Cannot be profitable even with 500 lots.")
     with col_be2:
         lot_range = list(range(1, min(num_lots*4+1, 51)))
-        pnl_by_lots = [abs(spread_per_unit)*n*lot - brokerage*(2*n+2) - s0*n*lot*0.001 - (c_mkt+p_mkt)*n*lot for n in lot_range]
+        # Fixed syntax: Added * and added 'for n in lot_range' to create the list for the chart
+pnl_by_lots = [(abs(spread_per_unit) * n * lot) - (brokerage * (2 * n + 2)) - (s0 * n * lot * 0.001) for n in lot_range]
         fig2 = go.Figure()
         fig2.add_trace(go.Bar(x=lot_range, y=pnl_by_lots, marker_color=[signal_color if p > 0 else "#dc3545" for p in pnl_by_lots]))
         fig2.add_hline(y=0, line_dash="dash", line_color="gray")
