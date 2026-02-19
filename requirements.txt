@@ -6,3 +6,4 @@ plotly
 ccxt
 python-dotenv
 scipy
+nsepython
