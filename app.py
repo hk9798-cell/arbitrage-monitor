@@ -354,17 +354,22 @@ with tab0:
             atm_sc    = float(round(sp_sc / step_sc) * step_sc)
 
             # ── PUT-CALL PARITY ────────────────────────────────────────────
-            if "Put-Call Parity" in scan_strategies:
+              if "Put-Call Parity" in scan_strategies:
                 def _lkp(df, k):
-                    if df.empty: return None
+                    if df is None or df.empty: return None
+                    # Use the asset-specific step_sc to find the closest strike
                     mask = np.isclose(df["strike"].values, k, rtol=0, atol=step_sc*0.4)
                     if not mask.any(): return None
                     p = df.loc[mask, "lastPrice"].values[0]
                     return float(round(p, 2)) if p > 0 else None
 
+                # FIX: Recalculate the ATM strike for the specific asset in this loop iteration
+                atm_sc = float(round(sp_sc / step_sc) * step_sc)
+
                 c_sc = _lkp(calls_sc, atm_sc)
                 p_sc = _lkp(puts_sc,  atm_sc)
 
+                # Fallback prices that scale with the current spot price
                 if c_sc is None: c_sc = round(sp_sc * 0.025, 2)
                 if p_sc is None: p_sc = round(sp_sc * 0.018, 2)
 
@@ -387,6 +392,7 @@ with tab0:
                             "asset":       asset_sc,
                             "type":        strategy_name,
                             "spot":        sp_sc,
+                            "strike":      atm_sc,  # Added this to verify in the table
                             "gap":         gap_sc,
                             "gross":       gross_sc,
                             "friction":    fric_sc,
