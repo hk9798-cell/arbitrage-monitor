@@ -353,7 +353,7 @@ with tab0:
             step_sc   = float(STRIKE_STEP[asset_sc])
             atm_sc    = float(round(sp_sc / step_sc) * step_sc)
 
-           # ── PUT-CALL PARITY (CORRECTED) ────────────────────────────────────────────
+           # ── PUT-CALL PARITY ────────────────────────────────────────────
             if "Put-Call Parity" in scan_strategies:
                 def _lkp(df, k):
                     if df is None or df.empty: return None
