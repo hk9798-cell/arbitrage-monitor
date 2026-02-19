@@ -353,23 +353,21 @@ with tab0:
             step_sc   = float(STRIKE_STEP[asset_sc])
             atm_sc    = float(round(sp_sc / step_sc) * step_sc)
 
-            # ── PUT-CALL PARITY ────────────────────────────────────────────
-              if "Put-Call Parity" in scan_strategies:
+           # ── PUT-CALL PARITY (CORRECTED) ────────────────────────────────────────────
+            if "Put-Call Parity" in scan_strategies:
                 def _lkp(df, k):
                     if df is None or df.empty: return None
-                    # Use the asset-specific step_sc to find the closest strike
                     mask = np.isclose(df["strike"].values, k, rtol=0, atol=step_sc*0.4)
                     if not mask.any(): return None
                     p = df.loc[mask, "lastPrice"].values[0]
                     return float(round(p, 2)) if p > 0 else None
 
-                # FIX: Recalculate the ATM strike for the specific asset in this loop iteration
+                # Recalculate strike for the current asset in loop (SBIN, RELIANCE, etc.)
                 atm_sc = float(round(sp_sc / step_sc) * step_sc)
 
                 c_sc = _lkp(calls_sc, atm_sc)
                 p_sc = _lkp(puts_sc,  atm_sc)
 
-                # Fallback prices that scale with the current spot price
                 if c_sc is None: c_sc = round(sp_sc * 0.025, 2)
                 if p_sc is None: p_sc = round(sp_sc * 0.018, 2)
 
@@ -392,21 +390,13 @@ with tab0:
                             "asset":       asset_sc,
                             "type":        strategy_name,
                             "spot":        sp_sc,
-                            "strike":      atm_sc,  # Added this to verify in the table
                             "gap":         gap_sc,
-                            "gross":       gross_sc,
-                            "friction":    fric_sc,
                             "net_pnl":     net_sc,
                             "ann_return":  ann_ret_sc,
-                            "expiry":      scan_expiry,
-                            "days":        (scan_expiry - today_sc).days,
                             "profitable":  profitable,
-                            "action":      ("Buy Spot · Buy Put · Sell Call"
-                                            if gap_sc > 0 else
-                                            "Short Spot · Sell Put · Buy Call"),
+                            "action":      "Check Parity",
                             "data_src":    spot_data[6],
                         })
-
             # ── FUTURES BASIS ──────────────────────────────────────────────
             if "Futures Basis" in scan_strategies:
                 carry_sc   = scan_r   # no dividend assumption
