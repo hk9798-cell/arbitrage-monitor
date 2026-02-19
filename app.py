@@ -1,3 +1,4 @@
+Content is user-generated and unverified.
 import streamlit as st
 import yfinance as yf
 import numpy as np
@@ -91,7 +92,7 @@ st.title("🏛️ Cross-Asset Arbitrage Opportunity Monitor")
 st.caption("IIT Roorkee · Department of Management Studies · Financial Engineering Project")
 
 # ── CONSTANTS ─────────────────────────────────────────────────────────────────
-LOT_SIZES      = {"NIFTY": 50,   "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
+LOT_SIZES      = {"NIFTY": 65,   "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
 STRIKE_STEP    = {"NIFTY": 50,   "RELIANCE": 20,  "TCS": 50,  "SBIN": 5,    "INFY": 20}
 FALLBACK_SPOTS = {"NIFTY": 25800.0, "RELIANCE": 1420.0, "TCS": 3850.0, "SBIN": 810.0, "INFY": 1580.0}
 TICKER_MAP     = {"NIFTY": "^NSEI", "RELIANCE": "RELIANCE.NS", "TCS": "TCS.NS", "SBIN": "SBIN.NS", "INFY": "INFY.NS"}
@@ -747,19 +748,19 @@ with tab1:
     p1, p2, p3 = st.columns(3)
     with p1:
         default_strike = float(round(s0 / step) * step)
-        strike = st.number_input("Strike Price (₹)", value=default_strike, step=step, format="%.2f", key="pcp_strike")
+        strike = st.number_input("Strike Price (₹)", value=default_strike, step=step, format="%.2f", key="pcp_strike_{}".format(asset))
     with p2:
         live_call    = lookup_option_price(calls_df, strike)
         call_default = live_call if live_call is not None else round(s0 * 0.025, 2)
         call_src     = "🟢 Live" if live_call is not None else "🟡 Enter manually"
         c_mkt = st.number_input("Call Price (₹)  {}".format(call_src),
-                                value=float(call_default), min_value=0.01, step=0.5, format="%.2f", key="pcp_call")
+                                value=float(call_default), min_value=0.01, step=0.5, format="%.2f", key="pcp_call_{}".format(asset))
     with p3:
         live_put    = lookup_option_price(puts_df, strike)
         put_default = live_put if live_put is not None else round(s0 * 0.018, 2)
         put_src     = "🟢 Live" if live_put is not None else "🟡 Enter manually"
         p_mkt = st.number_input("Put Price (₹)  {}".format(put_src),
-                                value=float(put_default), min_value=0.01, step=0.5, format="%.2f", key="pcp_put")
+                                value=float(put_default), min_value=0.01, step=0.5, format="%.2f", key="pcp_put_{}".format(asset))
 
     # ── CALCULATIONS ──────────────────────────────────────────────────────────
     pv_k            = strike * np.exp(-r_rate * t)
@@ -1065,14 +1066,12 @@ with tab2:
               delta="≈ USD {:,.2f}".format(irp_net_usd), delta_color="off")
 
     st.markdown(
-    '''
-    <div style="background:{0}; padding:14px; border-radius:10px; text-align:center; color:white; margin:12px 0;">
-        <h2 style="margin:0; font-size:20px;">{1}</h2>
-        <p style="margin:4px 0 0; font-size:14px; opacity:.9;">Notional: USD {2:,.0f} | Maturity: {3} ({4} days)</p>
-    </div>
-    '''.format(irp_color, irp_signal, notional_usd, irp_expiry.strftime("%d %b %Y"), irp_days),
-    unsafe_allow_html=True
-)
+        '<div style="background:{c}; padding:14px; border-radius:10px; text-align:center; color:white; margin:12px 0;">'
+        '<h2 style="margin:0; font-size:20px;">{s}</h2>'
+        '<p style="margin:4px 0 0; font-size:14px; opacity:.9;">Notional: USD {n:,.0f} | Maturity: {e} ({d} days)</p>'
+        '</div>'.format(c=irp_color, s=irp_signal, n=notional_usd,
+                        e=irp_expiry.strftime("%d %b %Y"), d=irp_days),
+        unsafe_allow_html=True)
 
     st.markdown("#### 📐 Detailed Calculation")
     irp_calc = pd.DataFrame({
@@ -1174,7 +1173,7 @@ with tab3:
         fb_s0      = fb_s0_data[0]
 
     fb_spot    = st.number_input("Spot Price (₹)", value=float(fb_s0), min_value=1.0, step=1.0,
-                                 format="%.2f", key="fb_spot")
+                                 format="%.2f", key="fb_spot_{}".format(fb_asset))
     r_carry    = r_rate + (holding_cost_pct / 100)
     fb_fair    = fb_spot * np.exp(r_carry * fb_T)
     fb_lot_sz  = LOT_SIZES[fb_asset]
@@ -1182,7 +1181,7 @@ with tab3:
 
     fb_mkt = st.number_input("Market Futures Price (₹)",
                              value=float(round(fb_fair + 50, 2)),
-                             min_value=1.0, step=1.0, format="%.2f", key="fb_fmkt",
+                             min_value=1.0, step=1.0, format="%.2f", key="fb_fmkt_{}".format(fb_asset),
                              help="The actual futures price quoted on NSE/BSE")
 
     # Calculations
