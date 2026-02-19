@@ -171,7 +171,7 @@ with c1:
     default_strike = float(round(s0 / step) * step)
     strike = st.number_input("Strike Price (₹)", value=default_strike, step=step, format="%.2f")
 
-def lookup_option_price(chain_df: pd.DataFrame, target_strike: float) -> float | None:
+def lookup_option_price(chain_df: pd.DataFrame, target_strike: float):
     """
     FIX 2: Use np.isclose for float strike matching instead of exact equality.
     Returns lastPrice if a close match is found, else None.
@@ -503,4 +503,4 @@ st.info(
 # ─────────────────────────────────────────────────────────────────────────────
 # 12. SENSITIVITY: HOW MANY LOTS TO BREAK EVEN?
 # ─────────────────────────────────────────────────────────────────────────────
-if signal_type != "none" and abs
+if signal_type != "none" and abs(spread_per_unit
