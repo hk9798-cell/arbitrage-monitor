@@ -18,43 +18,157 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 
 st.markdown("""
     <style>
-    .main { background-color: #f0f2f6; }
-    label[data-testid="stWidgetLabel"] p { font-weight: bold !important; font-size: 14px !important; }
-    div[data-testid="stMetricLabel"] p  { font-weight: bold !important; font-size: 13px !important; }
-    div[data-testid="stMetricValue"]    { font-size: 24px; color: #1f77b4; font-weight: bold; }
+    /* ── GLOBAL DARK NAVY THEME ── */
+    .stApp { background-color: #0d1b2a !important; }
+    .main  { background-color: #0d1b2a !important; }
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0d1b3e 0%, #1a3a6b 100%) !important;
+        border-right: 2px solid #f59e0b !important;
+    }
+    section[data-testid="stSidebar"] * { color: #e2e8f0 !important; }
+    section[data-testid="stSidebar"] .stSlider > div > div > div { background: #f59e0b !important; }
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3 { color: #f59e0b !important; }
+
+    /* ── TABS ── */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #1a3a6b !important;
+        border-radius: 10px 10px 0 0;
+        padding: 4px 8px 0;
+        gap: 4px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: transparent !important;
+        color: #94a3b8 !important;
+        border-radius: 8px 8px 0 0 !important;
+        padding: 8px 16px !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #f59e0b !important;
+        color: #0d1b2a !important;
+    }
+    .stTabs [data-baseweb="tab-panel"] {
+        background-color: #112240 !important;
+        border-radius: 0 0 10px 10px;
+        padding: 20px !important;
+    }
+
+    /* ── METRICS ── */
+    div[data-testid="stMetricLabel"] p {
+        font-weight: 700 !important; font-size: 12px !important;
+        color: #94a3b8 !important; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: 22px !important; font-weight: 800 !important; color: #f59e0b !important;
+    }
+    div[data-testid="stMetric"] {
+        background: #1e3a5f !important; border-radius: 10px !important;
+        padding: 12px 16px !important; border: 1px solid #2d5a8e !important;
+    }
+
+    /* ── DATAFRAMES ── */
+    .stDataFrame { border-radius: 10px !important; overflow: hidden; }
+    .stDataFrame thead th {
+        background-color: #1a3a6b !important; color: #f59e0b !important;
+        font-weight: 700 !important;
+    }
+
+    /* ── INPUTS / SELECTBOX ── */
+    .stSelectbox > div > div,
+    .stNumberInput > div > div > input,
+    .stTextInput > div > div > input {
+        background-color: #1e3a5f !important;
+        color: #e2e8f0 !important;
+        border: 1px solid #2d5a8e !important;
+        border-radius: 8px !important;
+    }
+    label[data-testid="stWidgetLabel"] p {
+        font-weight: 700 !important; font-size: 13px !important; color: #cbd5e1 !important;
+    }
+
+    /* ── BUTTONS ── */
+    .stButton > button {
+        background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+        color: #0d1b2a !important; font-weight: 800 !important;
+        border: none !important; border-radius: 8px !important;
+        padding: 8px 20px !important; transition: all 0.2s !important;
+    }
+    .stButton > button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(245,158,11,0.4) !important; }
+
+    /* ── TEXT ── */
+    h1, h2, h3, h4, h5, p, li, span, div { color: #e2e8f0; }
+    .stMarkdown p { color: #cbd5e1 !important; }
+    .stCaption   { color: #64748b !important; }
+
+    /* ── EXPANDER ── */
+    .streamlit-expanderHeader {
+        background-color: #1e3a5f !important; border-radius: 8px !important;
+        color: #f59e0b !important; font-weight: 700 !important;
+    }
+    .streamlit-expanderContent { background-color: #112240 !important; }
+
+    /* ── DIVIDER ── */
+    hr { border-color: #2d5a8e !important; }
+
+    /* ── CUSTOM CARDS ── */
     .warning-box {
-        background-color: #fff3cd; border-left: 5px solid #ffc107;
-        padding: 10px 16px; border-radius: 6px; color: #856404;
+        background-color: #422006; border-left: 5px solid #f59e0b;
+        padding: 10px 16px; border-radius: 6px; color: #fde68a;
         font-weight: 500; margin-top: 8px;
     }
     .nse-link-box {
-        background-color: #e8f4fd; border-left: 5px solid #1f77b4;
-        padding: 10px 16px; border-radius: 6px; color: #1a3a5c;
+        background-color: #1e3a5f; border-left: 5px solid #3b82f6;
+        padding: 10px 16px; border-radius: 6px; color: #93c5fd;
         font-size: 14px; margin-top: 6px;
     }
+    .nse-link-box a { color: #60a5fa !important; }
     .strategy-card {
-        background-color: #ffffff; border-left: 5px solid #2563eb;
+        background-color: #1e3a5f; border-left: 5px solid #f59e0b;
         padding: 12px 16px; border-radius: 8px; margin-bottom: 10px;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
     .opp-card-green {
-        background: linear-gradient(135deg, #d4edda, #c3e6cb);
-        border-left: 6px solid #28a745; border-radius: 10px;
+        background: linear-gradient(135deg, #052e16, #14532d);
+        border-left: 6px solid #22c55e; border-radius: 10px;
         padding: 14px 18px; margin-bottom: 10px;
+        box-shadow: 0 2px 12px rgba(34,197,94,0.2);
     }
     .opp-card-red {
-        background: linear-gradient(135deg, #f8d7da, #f5c6cb);
-        border-left: 6px solid #dc3545; border-radius: 10px;
+        background: linear-gradient(135deg, #2d0a0a, #450a0a);
+        border-left: 6px solid #ef4444; border-radius: 10px;
         padding: 14px 18px; margin-bottom: 10px;
     }
     .opp-card-grey {
-        background: #f1f3f5; border-left: 6px solid #adb5bd; border-radius: 10px;
+        background: #1e3a5f; border-left: 6px solid #475569; border-radius: 10px;
         padding: 14px 18px; margin-bottom: 10px;
     }
     .scanner-badge {
         display:inline-block; padding:3px 10px; border-radius:12px;
         font-size:12px; font-weight:700; margin-right:6px;
     }
+    .ticker-bar {
+        background: linear-gradient(90deg, #0d1b3e, #1a3a6b);
+        border: 1px solid #f59e0b; border-radius: 10px;
+        padding: 10px 20px; margin-bottom: 16px;
+        display: flex; gap: 20px; flex-wrap: wrap; align-items: center;
+    }
+    .ticker-item {
+        font-size: 13px; font-weight: 700; color: #e2e8f0;
+        display: inline-flex; align-items: center; gap: 6px;
+    }
+    @keyframes pulse-green {
+        0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
+        50%      { box-shadow: 0 0 0 8px rgba(34,197,94,0); }
+    }
+    @keyframes pulse-red {
+        0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+        50%      { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+    }
+    .signal-pulse-green { animation: pulse-green 2s infinite; }
+    .signal-pulse-red   { animation: pulse-red   2s infinite; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -88,8 +202,71 @@ def _init_settings():
 
 _init_settings()
 
-st.title("🏛️ Cross-Asset Arbitrage Opportunity Monitor")
-st.caption("IIT Roorkee · Department of Management Studies · Financial Engineering Project")
+st.markdown("""
+<div style="display:flex; align-items:center; gap:16px; margin-bottom:4px;">
+  <span style="font-size:2rem;">🏛️</span>
+  <div>
+    <h1 style="margin:0; font-size:1.8rem; font-weight:900; color:#f59e0b;
+               letter-spacing:-0.02em;">Cross-Asset Arbitrage Opportunity Monitor</h1>
+    <p style="margin:0; font-size:13px; color:#64748b;">
+      IIT Roorkee &nbsp;·&nbsp; Department of Management Studies &nbsp;·&nbsp;
+      Financial Engineering Project &nbsp;·&nbsp; Developed by: <b style="color:#94a3b8;">Group 4</b>
+    </p>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+# ── FEATURE 1: LIVE MARKET STATUS TICKER BAR ─────────────────────────────────
+@st.cache_data(ttl=120, show_spinner=False)
+def get_ticker_bar_data():
+    """Fetch all 5 asset spots + USD/INR for the header bar."""
+    results = {}
+    for name, ticker in TICKER_MAP.items():
+        try:
+            h = yf.Ticker(ticker).history(period="2d")
+            if not h.empty:
+                price = float(h["Close"].iloc[-1])
+                prev  = float(h["Close"].iloc[-2]) if len(h) > 1 else price
+                results[name] = {"price": price, "chg": price - prev, "chg_pct": (price-prev)/prev*100}
+        except Exception:
+            results[name] = {"price": FALLBACK_SPOTS[name], "chg": 0, "chg_pct": 0}
+    try:
+        fx = yf.Ticker("USDINR=X").history(period="2d")
+        if not fx.empty:
+            p = float(fx["Close"].iloc[-1])
+            prev = float(fx["Close"].iloc[-2]) if len(fx) > 1 else p
+            results["USD/INR"] = {"price": p, "chg": p-prev, "chg_pct": (p-prev)/prev*100}
+    except Exception:
+        results["USD/INR"] = {"price": 83.50, "chg": 0, "chg_pct": 0}
+    return results
+
+with st.spinner(""):
+    ticker_data = get_ticker_bar_data()
+
+now_str = datetime.datetime.now().strftime("%H:%M:%S")
+ticker_html = '''<div style="background:linear-gradient(90deg,#0d1b3e,#1a3a6b);
+    border:1px solid #f59e0b; border-radius:10px; padding:10px 20px;
+    margin-bottom:16px; display:flex; gap:0; flex-wrap:wrap; align-items:center;">
+    <span style="font-size:11px;color:#f59e0b;font-weight:800;
+          margin-right:20px;letter-spacing:0.1em;">● LIVE MARKET</span>'''
+
+for asset_name, d in ticker_data.items():
+    color  = "#22c55e" if d["chg"] >= 0 else "#ef4444"
+    arrow  = "▲" if d["chg"] >= 0 else "▼"
+    prefix = "₹" if asset_name != "USD/INR" else ""
+    ticker_html += (
+        '<span style="font-size:13px;font-weight:700;color:#e2e8f0;'
+        'margin-right:24px;display:inline-flex;align-items:center;gap:5px;">'
+        '<span style="color:#94a3b8;font-size:11px;">{n}</span>'
+        '{p}{v:,.2f}'
+        '<span style="color:{c};font-size:11px;">{a} {p2}{chg:.2f} ({pct:.2f}%)</span>'
+        '</span>'.format(
+            n=asset_name, p=prefix, v=d["price"],
+            c=color, a=arrow, p2=prefix, chg=abs(d["chg"]), pct=abs(d["chg_pct"]))
+    )
+
+ticker_html += '<span style="margin-left:auto;font-size:11px;color:#475569;">Updated: {t}</span></div>'.format(t=now_str)
+st.markdown(ticker_html, unsafe_allow_html=True)
 
 # ── CONSTANTS ─────────────────────────────────────────────────────────────────
 LOT_SIZES      = {"NIFTY": 65,   "RELIANCE": 250, "TCS": 175, "SBIN": 1500, "INFY": 400}
@@ -271,13 +448,14 @@ with st.sidebar:
 # ══════════════════════════════════════════════════════════════════════════════
 # TABS
 # ══════════════════════════════════════════════════════════════════════════════
-tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab0, tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "🔍 All Opportunities",
     "📐 Put-Call Parity",
     "🌍 Interest Rate Parity",
     "📦 Futures Basis (Cash & Carry)",
     "⚖️ Cross-Market Spread",
     "⚙️ Settings",
+    "📚 Documentation",
 ])
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -601,7 +779,7 @@ with tab0:
                             overlaying="y", side="right", tickformat=".1f"),
                 height=380, margin=dict(t=45, b=40, l=10, r=10),
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                plot_bgcolor="#f8f9fa", paper_bgcolor="white", barmode="group")
+                plot_bgcolor="#112240", paper_bgcolor="#112240", barmode="group")
             st.plotly_chart(fig_scan, use_container_width=True)
 
         # ── Exportable summary table ───────────────────────────────────────
@@ -791,23 +969,57 @@ with tab1:
 
     # ── METRICS ROW ───────────────────────────────────────────────────────────
     st.markdown("---")
-    m1, m2, m3, m4, m5, m6 = st.columns(6)
-    m1.metric("Market Spot",     "₹{:,.2f}".format(s0))
-    m2.metric("Synthetic Price", "₹{:,.2f}".format(synthetic_spot))
-    m3.metric("PV(Strike)",      "₹{:,.2f}".format(pv_k))
-    m4.metric("Gap / unit",      "₹{:.2f}".format(abs(spread_per_unit)))
-    m5.metric("Total Friction",  "₹{:,.2f}".format(total_friction))
-    m6.metric("Net P&L",         "₹{:,.2f}".format(net_pnl),
+    ann_return_pcp = (net_pnl / max(s0 * total_units * margin_pct, 1)) * (365 / max(days_to_expiry, 1)) * 100
+
+    m1, m2, m3, m4, m5, m6, m7 = st.columns(7)
+    m1.metric("Market Spot",       "₹{:,.2f}".format(s0))
+    m2.metric("Synthetic Price",   "₹{:,.2f}".format(synthetic_spot))
+    m3.metric("PV(Strike)",        "₹{:,.2f}".format(pv_k))
+    m4.metric("Gap / unit",        "₹{:.2f}".format(abs(spread_per_unit)))
+    m5.metric("Total Friction",    "₹{:,.2f}".format(total_friction))
+    m6.metric("Net P&L",           "₹{:,.2f}".format(net_pnl),
               delta="✅ Profitable" if pnl_profitable else "❌ Loss after costs",
               delta_color="normal" if pnl_profitable else "inverse")
+    m7.metric("Ann. Return",       "{:.2f}%".format(ann_return_pcp),
+              delta="{} days".format(days_to_expiry), delta_color="off")
 
+    pulse_class = "signal-pulse-green" if signal_type == "conversion" else (
+                   "signal-pulse-red"   if signal_type == "reversal" else "")
     st.markdown(
-        '<div style="background:{c}; padding:14px; border-radius:10px; text-align:center; '
-        'color:white; margin:12px 0;"><h2 style="margin:0; font-size:22px;">{s}</h2>'
-        '<p style="margin:4px 0 0; font-size:15px; opacity:.9;">Strategy: {d} | Expiry: {e} ({dte} days)</p></div>'.format(
-            c=signal_color, s=signal_line, d=strategy_desc,
-            e=expiry_date.strftime("%d %b %Y"), dte=days_to_expiry),
+        '<div class="{pulse}" style="background:{c}; padding:16px; border-radius:12px; text-align:center; '
+        'color:white; margin:12px 0; border: 2px solid rgba(255,255,255,0.2);">'
+        '<h2 style="margin:0; font-size:22px; font-weight:900;">{s}</h2>'
+        '<p style="margin:4px 0 0; font-size:14px; opacity:.9;">'
+        'Strategy: <b>{d}</b> &nbsp;|&nbsp; Expiry: <b>{e}</b> &nbsp;|&nbsp; '
+        '<b>{dte} days</b> &nbsp;|&nbsp; Ann. Return: <b>{ann:.2f}%</b></p></div>'.format(
+            pulse=pulse_class, c=signal_color, s=signal_line, d=strategy_desc,
+            e=expiry_date.strftime("%d %b %Y"), dte=days_to_expiry, ann=ann_return_pcp),
         unsafe_allow_html=True)
+
+
+    # ── FEATURE 12: ALERT SYSTEM ─────────────────────────────────────────────
+    alert_threshold = st.session_state.get("alert_threshold", 500)
+    if signal_type != "none" and pnl_profitable and net_pnl >= alert_threshold:
+        st.markdown(
+            '''<div style="background:linear-gradient(135deg,#052e16,#14532d);
+                border:3px solid #22c55e; border-radius:12px; padding:16px 24px;
+                text-align:center; margin:8px 0;
+                box-shadow: 0 0 30px rgba(34,197,94,0.4);"
+                class="signal-pulse-green">
+              <div style="font-size:28px;">🚨</div>
+              <div style="font-size:20px;font-weight:900;color:#22c55e;">
+                TRADE SIGNAL — EXECUTE NOW</div>
+              <div style="font-size:14px;color:#86efac;margin-top:4px;">
+                Net Profit ₹{pnl:,.2f} exceeds your alert threshold of ₹{thr:,.0f}
+                &nbsp;|&nbsp; Ann. Return: {ann:.2f}%
+                &nbsp;|&nbsp; Expiry: {exp}
+              </div>
+            </div>'''.format(
+                pnl=net_pnl, thr=alert_threshold,
+                ann=ann_return_pcp, exp=expiry_date.strftime("%d %b %Y")),
+            unsafe_allow_html=True)
+    elif signal_type != "none" and pnl_profitable:
+        st.info("💡 Profitable opportunity found. Raise alert threshold in ⚙️ Settings to trigger the TRADE NOW banner.")
 
     if signal_type != "none" and not pnl_profitable:
         st.markdown('<div class="warning-box">⚠️ Gap detected but NOT profitable after costs. Do not trade.</div>',
@@ -836,6 +1048,42 @@ with tab1:
                   delta_color="normal" if pnl_profitable else "inverse")
         st.caption("Across {:,} units ({} lot{} × {})".format(
             total_units, num_lots, "s" if num_lots > 1 else "", lot))
+        # ── FEATURE 10: EXECUTION TIMELINE ───────────────────────────────────
+        if signal_type != "none":
+            st.markdown("**⏱️ Trade Execution Timeline:**")
+            mid_day = max(days_to_expiry // 2, 1)
+            tl_x = [0, mid_day, days_to_expiry]
+            tl_labels = ["Day 0\nOpen Position", "Day {}\nMonitor".format(mid_day),
+                         "Day {}\nClose / Expiry".format(days_to_expiry)]
+            tl_y = [1, 1, 1]
+            fig_tl = go.Figure()
+            fig_tl.add_trace(go.Scatter(
+                x=tl_x, y=tl_y, mode="lines+markers+text",
+                line=dict(color="#f59e0b", width=3),
+                marker=dict(size=[16,10,16],
+                            color=["#22c55e","#f59e0b","#3b82f6"],
+                            symbol=["circle","circle","star"],
+                            line=dict(color="#112240", width=2)),
+                text=tl_labels, textposition="bottom center",
+                textfont=dict(size=10, color="#e2e8f0")))
+            # Profit annotation at end
+            fig_tl.add_annotation(
+                x=days_to_expiry, y=1.15,
+                text="<b>Net ₹{:,.0f}</b>".format(net_pnl),
+                font=dict(size=13, color="#22c55e" if pnl_profitable else "#ef4444"),
+                showarrow=False, bgcolor="#0d1b3e",
+                bordercolor="#22c55e" if pnl_profitable else "#ef4444",
+                borderwidth=1, borderpad=4)
+            fig_tl.update_layout(
+                height=150, margin=dict(t=20,b=50,l=20,r=20),
+                xaxis=dict(title="Days", range=[-2, days_to_expiry+5],
+                           showgrid=False, color="#94a3b8"),
+                yaxis=dict(visible=False, range=[0.5, 1.5]),
+                plot_bgcolor="#112240", paper_bgcolor="#112240",
+                font=dict(color="#e2e8f0"), showlegend=False)
+            st.plotly_chart(fig_tl, use_container_width=True)
+
+
 
     with col_graph:
         prices = np.linspace(s0 * 0.75, s0 * 1.25, 300)
@@ -876,7 +1124,7 @@ with tab1:
                         range=[-net_pad, net_pad], showgrid=True, gridcolor="#e9ecef"),
             height=370, margin=dict(t=45, b=40, l=10, r=10),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            hovermode="x unified", plot_bgcolor="#f8f9fa", paper_bgcolor="white")
+            hovermode="x unified", plot_bgcolor="#112240", paper_bgcolor="#112240")
         st.plotly_chart(fig, use_container_width=True)
         st.caption("📌 Dotted = individual legs (left axis). Solid = Net P&L after costs (right axis). The flat line proves the arbitrage is locked.")
 
@@ -904,6 +1152,83 @@ with tab1:
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
     st.info("**Gross P&L = ₹{:,.2f}** (gap × units).  **Net P&L = ₹{:,.2f}** (Gross − Friction). "
             "Identical in every row — the arbitrage is locked at inception.".format(gross_spread, net_pnl))
+    # ── FEATURE 3: HISTORICAL GAP CHART ─────────────────────────────────────
+    st.divider()
+    with st.expander("📈 Historical Arbitrage Gap Analysis (last 30 days)", expanded=False):
+        @st.cache_data(ttl=3600, show_spinner=False)
+        def get_hist_gap(asset_n, k, r, t_days):
+            try:
+                ticker_h = TICKER_MAP[asset_n]
+                hist = yf.Ticker(ticker_h).history(period="35d")["Close"].dropna()
+                if len(hist) < 5:
+                    return pd.DataFrame()
+                dates, gaps, synths = [], [], []
+                for i, (date, spot_h) in enumerate(hist.items()):
+                    days_left = max(t_days - i, 1)
+                    T_h       = days_left / 365.0
+                    pv_k_h    = k * np.exp(-r * T_h)
+                    # Use fixed option prices as proxy (ATM approx from BSM 20% vol)
+                    import math
+                    sigma_h = 0.20
+                    if T_h > 0:
+                        d1h = (math.log(spot_h/k) + (r + 0.5*sigma_h**2)*T_h) / (sigma_h*math.sqrt(T_h))
+                        d2h = d1h - sigma_h*math.sqrt(T_h)
+                        try:
+                            from scipy.stats import norm as _n
+                            c_h = spot_h*_n.cdf(d1h) - k*math.exp(-r*T_h)*_n.cdf(d2h)
+                            p_h = k*math.exp(-r*T_h)*_n.cdf(-d2h) - spot_h*_n.cdf(-d1h)
+                        except Exception:
+                            c_h = spot_h * 0.025; p_h = spot_h * 0.018
+                    else:
+                        c_h = max(spot_h - k, 0); p_h = max(k - spot_h, 0)
+                    synth_h = c_h - p_h + pv_k_h
+                    gap_h   = spot_h - synth_h
+                    dates.append(date); gaps.append(gap_h); synths.append(synth_h)
+                df_hist = pd.DataFrame({"Date": dates, "Spot": hist.values[:len(dates)],
+                                        "Synthetic": synths, "Gap": gaps})
+                return df_hist
+            except Exception:
+                return pd.DataFrame()
+
+        df_gap = get_hist_gap(asset, strike, r_rate, days_to_expiry)
+        if df_gap.empty:
+            st.info("Historical data unavailable. Live spot required.")
+        else:
+            fig_hist = go.Figure()
+            colors_gap = ["#22c55e" if g > 0 else "#ef4444" for g in df_gap["Gap"]]
+            fig_hist.add_trace(go.Bar(
+                x=df_gap["Date"], y=df_gap["Gap"],
+                name="Arbitrage Gap (Spot − Synthetic)",
+                marker_color=colors_gap, opacity=0.8))
+            fig_hist.add_hline(y=0, line_dash="dash", line_color="#94a3b8", line_width=1)
+            fig_hist.add_hline(y=s0 * (arb_threshold_pct/100),
+                               line_dash="dot", line_color="#f59e0b", line_width=1.5,
+                               annotation_text="Long threshold", annotation_font_color="#f59e0b")
+            fig_hist.add_hline(y=-s0 * (arb_threshold_pct/100),
+                               line_dash="dot", line_color="#f59e0b", line_width=1.5,
+                               annotation_text="Short threshold", annotation_font_color="#f59e0b")
+            fig_hist.update_layout(
+                title="30-Day Historical PCP Gap — {} (BSM-estimated options)".format(asset),
+                xaxis=dict(title="Date", showgrid=False),
+                yaxis=dict(title="Gap per unit (₹)", tickformat=",.2f",
+                           gridcolor="#1e3a5f"),
+                height=300, margin=dict(t=40,b=30,l=10,r=10),
+                plot_bgcolor="#112240", paper_bgcolor="#112240",
+                font=dict(color="#e2e8f0"), showlegend=False)
+            st.plotly_chart(fig_hist, use_container_width=True)
+
+            avg_gap = df_gap["Gap"].mean()
+            pos_days = (df_gap["Gap"] > s0*(arb_threshold_pct/100)).sum()
+            neg_days = (df_gap["Gap"] < -s0*(arb_threshold_pct/100)).sum()
+            hg1, hg2, hg3, hg4 = st.columns(4)
+            hg1.metric("Avg Gap (30d)",       "₹{:.2f}".format(avg_gap))
+            hg2.metric("Conversion Days",     "{}/{}".format(pos_days, len(df_gap)))
+            hg3.metric("Reversal Days",       "{}/{}".format(neg_days, len(df_gap)))
+            hg4.metric("Today's Gap",         "₹{:.2f}".format(spread_per_unit))
+            st.caption("⚠️ Historical gaps computed using BSM-estimated theoretical option prices at 20% implied vol. "
+                       "Actual market gaps would differ based on real option premiums.")
+
+
 
     # ── GREEKS PANEL ──────────────────────────────────────────────────────────
     st.divider()
@@ -966,10 +1291,97 @@ with tab1:
             fg.update_layout(title="Combined Position Greeks (🟢=hedged 🟡=moderate 🔴=exposed)",
                              yaxis=dict(title="Absolute Value"), height=280,
                              margin=dict(t=40,b=20,l=10,r=10),
-                             plot_bgcolor="#f8f9fa", paper_bgcolor="white", showlegend=False)
+                             plot_bgcolor="#112240", paper_bgcolor="#112240", showlegend=False)
             st.plotly_chart(fg, use_container_width=True)
             st.info("A perfect PCP arbitrage has Delta≈0, Gamma≈0, Vega≈0. Residual Theta and Rho "
                     "confirm the position is locked but sensitive to time decay and rate changes.")
+    # ── FEATURE 8: SENSITIVITY ANALYSIS ─────────────────────────────────────
+    st.divider()
+    with st.expander("🎯 Sensitivity Analysis — How P&L Changes with Rate & Volatility", expanded=False):
+        sa1, sa2 = st.columns(2)
+        with sa1:
+            st.markdown("##### Net P&L vs Risk-Free Rate")
+            r_range   = np.linspace(0.04, 0.10, 25)
+            pnl_r     = []
+            for r_test in r_range:
+                pv_k_t   = strike * np.exp(-r_test * t)
+                synth_t  = c_mkt - p_mkt + pv_k_t
+                gap_t    = s0 - synth_t
+                gross_t  = abs(gap_t) * total_units
+                net_t    = gross_t - total_friction
+                pnl_r.append(net_t)
+            fig_sa1 = go.Figure()
+            fig_sa1.add_trace(go.Scatter(
+                x=r_range * 100, y=pnl_r, mode="lines+markers",
+                line=dict(color="#f59e0b", width=2.5),
+                marker=dict(size=5, color="#f59e0b"),
+                fill="tozeroy", fillcolor="rgba(245,158,11,0.12)"))
+            fig_sa1.add_vline(x=r_rate*100, line_dash="dash", line_color="#22c55e",
+                              annotation_text="Current {:.2f}%".format(r_rate*100),
+                              annotation_font_color="#22c55e")
+            fig_sa1.add_hline(y=0, line_dash="dash", line_color="#ef4444", line_width=1)
+            fig_sa1.update_layout(
+                xaxis=dict(title="Risk-Free Rate (%)", gridcolor="#1e3a5f"),
+                yaxis=dict(title="Net P&L (₹)", tickformat=",.0f", gridcolor="#1e3a5f"),
+                height=260, margin=dict(t=20,b=30,l=10,r=10),
+                plot_bgcolor="#112240", paper_bgcolor="#112240",
+                font=dict(color="#e2e8f0"), showlegend=False)
+            st.plotly_chart(fig_sa1, use_container_width=True)
+
+        with sa2:
+            st.markdown("##### Net P&L vs Call–Put Spread (Option Price Sensitivity)")
+            spread_range = np.linspace(-50, 50, 25)   # ₹ change in C−P spread
+            pnl_cp = []
+            for delta_cp in spread_range:
+                c_test   = c_mkt + delta_cp / 2
+                p_test   = p_mkt - delta_cp / 2
+                synth_t  = c_test - p_test + pv_k
+                gap_t    = s0 - synth_t
+                gross_t  = abs(gap_t) * total_units
+                fric_t   = brokerage * (fno_orders+2) + stt_spot + (c_test+p_test)*total_units*0.000625
+                net_t    = gross_t - fric_t
+                pnl_cp.append(net_t)
+            fig_sa2 = go.Figure()
+            fig_sa2.add_trace(go.Scatter(
+                x=spread_range, y=pnl_cp, mode="lines+markers",
+                line=dict(color="#3b82f6", width=2.5),
+                marker=dict(size=5, color="#3b82f6"),
+                fill="tozeroy", fillcolor="rgba(59,130,246,0.12)"))
+            fig_sa2.add_vline(x=0, line_dash="dash", line_color="#22c55e",
+                              annotation_text="Current", annotation_font_color="#22c55e")
+            fig_sa2.add_hline(y=0, line_dash="dash", line_color="#ef4444", line_width=1)
+            fig_sa2.update_layout(
+                xaxis=dict(title="Change in (C − P) spread (₹)", gridcolor="#1e3a5f"),
+                yaxis=dict(title="Net P&L (₹)", tickformat=",.0f", gridcolor="#1e3a5f"),
+                height=260, margin=dict(t=20,b=30,l=10,r=10),
+                plot_bgcolor="#112240", paper_bgcolor="#112240",
+                font=dict(color="#e2e8f0"), showlegend=False)
+            st.plotly_chart(fig_sa2, use_container_width=True)
+
+        # Transaction cost breakdown pie chart
+        st.markdown("##### 🥧 Transaction Cost Breakdown")
+        pie_labels = ["Brokerage", "STT on Spot", "STT on Options"]
+        pie_values = [total_brokerage, stt_spot, stt_options]
+        fig_pie = go.Figure(go.Pie(
+            labels=pie_labels, values=pie_values,
+            hole=0.5,
+            marker=dict(colors=["#f59e0b", "#3b82f6", "#8b5cf6"],
+                        line=dict(color="#112240", width=2)),
+            textinfo="label+percent",
+            textfont=dict(color="#e2e8f0", size=13)))
+        fig_pie.update_layout(
+            height=260, margin=dict(t=20,b=10,l=10,r=10),
+            plot_bgcolor="#112240", paper_bgcolor="#112240",
+            font=dict(color="#e2e8f0"),
+            annotations=[dict(text="₹{:,.0f}".format(total_friction),
+                              x=0.5, y=0.5, font_size=16, font_color="#f59e0b",
+                              showarrow=False)])
+        st.plotly_chart(fig_pie, use_container_width=True)
+        st.caption("Sensitivity analysis shows how robust your arbitrage is. "
+                   "If Net P&L stays positive across a wide range of rate changes, "
+                   "the opportunity is genuine and not rate-dependent.")
+
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 2 — INTEREST RATE PARITY (IRP)
@@ -1113,7 +1525,7 @@ with tab2:
         xaxis=dict(title="Market Forward Rate (USD/INR)", tickformat=".4f"),
         yaxis=dict(title="Net Profit (₹)", tickformat=",.0f"),
         height=320, margin=dict(t=40,b=30,l=10,r=10),
-        plot_bgcolor="#f8f9fa", paper_bgcolor="white", showlegend=False)
+        plot_bgcolor="#112240", paper_bgcolor="#112240", showlegend=False)
     st.plotly_chart(fig_irp, use_container_width=True)
     st.caption("Green = Theoretical forward (no-arbitrage). Red = current market forward. Width of gap = arbitrage opportunity size.")
 
@@ -1284,7 +1696,7 @@ with tab3:
                     overlaying="y", side="right", tickformat=",.2f"),
         height=320, margin=dict(t=40,b=30,l=10,r=10),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        plot_bgcolor="#f8f9fa", paper_bgcolor="white")
+        plot_bgcolor="#112240", paper_bgcolor="#112240")
     st.plotly_chart(fig_fb, use_container_width=True)
     st.caption("As time passes, F* rises (cost of carry accumulates) and converges to F_mkt at expiry. "
                "The basis (orange dotted) decays to zero — this convergence locks in the arbitrage profit.")
@@ -1469,7 +1881,7 @@ with tab4:
                         overlaying="y", side="right"),
             height=340, margin=dict(t=40,b=30,l=10,r=10),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            plot_bgcolor="#f8f9fa", paper_bgcolor="white")
+            plot_bgcolor="#112240", paper_bgcolor="#112240")
         st.plotly_chart(fig_cms, use_container_width=True)
         st.caption("Red dotted lines = entry thresholds (±{:.0f}σ). Trade when spread crosses threshold and expect mean reversion. "
                    "⚠️ Statistical arbitrage carries model risk — spreads may not always revert.".format(z_entry))
@@ -1580,6 +1992,11 @@ with tab5:
         new_iv_default    = st.slider("Default Implied Volatility (%)", 5.0, 80.0,
                                        float(st.session_state.iv_pct),
                                        step=0.5, key="cfg_iv")
+        st.markdown("**🚨 Alert Threshold**")
+        new_alert_thr     = st.number_input("Minimum Net P&L to trigger TRADE NOW banner (₹)",
+                                             value=float(st.session_state.get("alert_threshold", 500)),
+                                             min_value=0.0, step=100.0, key="cfg_alert",
+                                             help="Shows a flashing alert banner when Net P&L exceeds this value")
 
     st.divider()
 
@@ -1603,6 +2020,7 @@ with tab5:
             st.session_state.show_metadata     = new_show_metadata
             st.session_state.margin_pct        = new_margin_pct
             st.session_state.iv_pct            = new_iv_default
+            st.session_state.alert_threshold   = new_alert_thr
             st.success("✅ Settings saved! All tabs will use updated values.")
 
     with reset_col:
@@ -1662,6 +2080,179 @@ with tab5:
         import time
         time.sleep(st.session_state.refresh_interval)
         st.rerun()
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 6 — DOCUMENTATION
+# ══════════════════════════════════════════════════════════════════════════════
+with tab6:
+    st.markdown("""
+    <div style="text-align:center; padding:20px 0 10px;">
+      <div style="font-size:48px;">📚</div>
+      <h1 style="color:#f59e0b; font-weight:900; margin:0;">Documentation</h1>
+      <p style="color:#94a3b8;">Complete guide to the Cross-Asset Arbitrage Monitor</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # About
+    doc_c1, doc_c2 = st.columns([2, 1])
+    with doc_c1:
+        st.markdown("""
+### 🏛️ About This Project
+The **Cross-Asset Arbitrage Opportunity Monitor** is a real-time financial dashboard
+that detects mispricing across options and futures markets by checking fundamental
+parity relationships. When market prices deviate from theoretical fair values,
+the dashboard calculates the arbitrage profit and provides step-by-step execution instructions.
+
+**Key Features:**
+- ✅ Put-Call Parity arbitrage detection
+- ✅ Futures Basis (Cost-of-Carry) arbitrage detection
+- ✅ Covered Interest Rate Parity (CIRP) detection
+- ✅ Cross-Market Statistical Spread Arbitrage
+- ✅ Live market data via yfinance (spot prices)
+- ✅ Option Greeks (Delta, Gamma, Theta, Vega, Rho) via Black-Scholes-Merton
+- ✅ Historical gap analysis and sensitivity analysis
+- ✅ Automated profit calculation including all transaction costs
+- ✅ Step-by-step execution strategy for each opportunity
+        """)
+
+    with doc_c2:
+        st.markdown("""
+### 👥 Project Team
+**Institution:** IIT Roorkee
+
+**Department:** Management Studies
+
+**Course:** Financial Engineering
+
+**Team:** Group 4
+
+**Supervisor:** Financial Engineering Faculty
+
+---
+**🔗 Live Dashboard:**
+arbitrage-monitor-anchalfeproject.streamlit.app
+
+**📦 GitHub:**
+github.com/[your-username]/arbitrage-monitor
+        """)
+
+    st.markdown("---")
+
+    # Strategies
+    st.markdown("## 📐 Arbitrage Strategies")
+    doc_tab_pcp, doc_tab_fb, doc_tab_irp, doc_tab_cms = st.tabs([
+        "Put-Call Parity", "Futures Basis", "Interest Rate Parity", "Cross-Market Spread"])
+
+    with doc_tab_pcp:
+        st.markdown("""
+#### Fundamental Relationship
+The price of a European call minus a European put equals the difference between
+the spot price and the present value of the strike:
+
+$$C - P = S_0 - K \\cdot e^{-rT}$$
+
+**Variables:**
+- `C` = Call option market price
+- `P` = Put option market price
+- `S₀` = Current spot price of underlying
+- `K` = Strike price (identical for both options)
+- `r` = Continuously compounded risk-free rate
+- `T` = Time to expiry in years
+
+#### Arbitrage Strategies
+| Gap | Condition | Strategy | Execution |
+|-----|-----------|----------|-----------|
+| Gap > 0 | Spot > Synthetic | **Conversion** | Buy Spot · Buy Put · Sell Call |
+| Gap < 0 | Synthetic > Spot | **Reversal** | Short Spot · Sell Put · Buy Call |
+| Gap ≈ 0 | Efficient market | **No Trade** | Wait and monitor |
+
+#### Why is the payoff locked?
+The three legs together form a synthetic forward position.
+At any expiry price, the individual leg gains and losses cancel perfectly,
+leaving only the arbitrage spread as profit.
+        """)
+
+    with doc_tab_fb:
+        st.markdown("""
+#### Cost-of-Carry Model
+The fair (no-arbitrage) futures price is:
+
+$$F^* = S \\cdot e^{(r + d) \\times T}$$
+
+where `d` = holding cost or dividend yield (negative for dividends).
+
+#### Strategies
+- **Cash & Carry (F_mkt > F*):** Buy spot, sell futures, hold to expiry, deliver
+- **Reverse C&C (F_mkt < F*):** Short spot, buy futures, accept delivery at expiry
+
+#### Basis
+`Basis = F_mkt − F*`
+
+The basis decays to zero at expiry — this convergence guarantees the locked profit.
+        """)
+
+    with doc_tab_irp:
+        st.markdown("""
+#### Covered Interest Rate Parity
+The theoretical forward exchange rate must satisfy:
+
+$$F = S \\times e^{(r_d - r_f) \\times T}$$
+
+where `r_d` = domestic rate (India), `r_f` = foreign rate (US), `S` = spot USD/INR.
+
+#### Arbitrage
+If `F_mkt ≠ F_theoretical`:
+1. Borrow in the lower-rate currency
+2. Convert at spot
+3. Invest at the higher-rate currency
+4. Lock in the forward to eliminate FX risk
+5. Collect the rate differential as risk-free profit
+        """)
+
+    with doc_tab_cms:
+        st.markdown("""
+#### Statistical Spread Arbitrage
+Two correlated assets maintain a long-run price relationship.
+The spread is: `Spread = Price_A − β × Price_B`
+
+where `β` = hedge ratio from OLS regression.
+
+**Z-Score:** `Z = (Spread − Mean) / Std Dev`
+
+When |Z| > threshold (typically 2.0):
+- Z > +2: Short A, Long B (spread will narrow)
+- Z < −2: Long A, Short B (spread will widen)
+
+⚠️ **Note:** Unlike PCP and IRP, this is statistical arbitrage — not risk-free.
+Use stop-losses and proper position sizing.
+        """)
+
+    st.markdown("---")
+    st.markdown("## 💸 Transaction Cost Model")
+    cost_table_data = {
+        "Cost Component":   ["Brokerage (flat)",   "STT on Spot",          "STT on Options (sell)", "STT on Futures"],
+        "Rate":             ["₹20 per order",       "0.1% of trade value",  "0.0625% of premium",    "0.0125% of trade"],
+        "Applied to":       ["All 4 orders",        "Spot buy side",        "Option sell side",      "Futures sell side"],
+        "Typical (1 lot)":  ["₹80",                 "~₹1,300–₹1,700",      "~₹35–₹80",             "~₹30–₹50"],
+    }
+    st.dataframe(pd.DataFrame(cost_table_data), hide_index=True, use_container_width=True)
+
+    st.markdown("---")
+    st.markdown("## ⚠️ Disclaimer")
+    st.warning("""
+    This dashboard is developed for **educational and research purposes** as part of the
+    Financial Engineering course at IIT Roorkee. It is **not financial advice**.
+
+    - Arbitrage windows in real markets last milliseconds and are exploited by HFT algorithms
+    - Transaction costs shown are approximate and may vary by broker and trade size
+    - NSE option chain data requires manual entry due to API restrictions on cloud servers
+    - All calculations assume European-style options and no early exercise
+    - Past arbitrage patterns do not guarantee future opportunities
+
+    Always consult a licensed financial advisor before executing real trades.
+    """)
 
 # ── GLOBAL FOOTER ─────────────────────────────────────────────────────────────
 st.divider()
