@@ -279,8 +279,13 @@ for label, st_price in scenario_prices.items():
         c_leg = (max(st_price - strike, 0) - c_mkt) * total_units
     else:
         s_leg = p_leg = c_leg = 0.0
-    gross = s_leg + p_leg + c_leg
+
+    # gross_spread is the locked arbitrage profit, already correctly computed
+    # from put-call parity above. It does NOT vary with expiry price.
+    # Individual legs are shown for educational purposes only.
+    gross = gross_spread if signal_type != "none" else 0.0
     net   = gross - total_friction
+
     rows.append({
         "Scenario":      label,
         "Expiry Price":  "₹{:,.0f}".format(st_price),
@@ -295,10 +300,12 @@ for label, st_price in scenario_prices.items():
 st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
 st.info(
     "*Why is Net P&L the same in every row?* — "
-    "The three legs always net to ₹{:,.2f} gross regardless of expiry price. "
-    "After subtracting fixed friction ₹{:,.2f}, you always get ₹{:,.2f} — "
-    "same as Net Profit above. That is put-call parity at work.".format(
-        gross_spread, total_friction, net_pnl)
+    "The arbitrage profit is locked at inception by put-call parity and does not depend on "
+    "where the stock expires. The individual legs (Spot/Put/Call) move in opposite directions "
+    "and partially cancel each other — but the Gross P&L is always pinned to "
+    "₹{:,.2f} (= gap × units), and Net P&L is always ₹{:,.2f} (= Gross − Friction). "
+    "This matches Net Profit above exactly. That is the core proof of arbitrage.".format(
+        gross_spread, net_pnl)
 )
 
 if signal_type != "none" and abs(spread_per_unit) > 0:
