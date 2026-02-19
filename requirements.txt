@@ -3,4 +3,6 @@ yfinance
 numpy
 pandas
 plotly
-
+ccxt
+python-dotenv
+scipy
