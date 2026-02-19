@@ -1,4 +1,3 @@
-Content is user-generated and unverified.
 import streamlit as st
 import yfinance as yf
 import numpy as np
