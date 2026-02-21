@@ -11,65 +11,67 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 
 st.markdown("""
     <style>
-    /* ── GLOBAL THEME ── */
-    [data-testid="stAppViewContainer"] {
-        background-color: #0d1117; /* True dark matte */
+    /* ── GLOBAL THEME & TEXT COLOR ── */
+    [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+        background-color: #0e1117 !important;
     }
     
-    /* ── METRIC CARDS ── */
-    div[data-testid="stMetric"] {
-        background: #161b22 !important; 
-        border-radius: 8px !important;
-        padding: 15px !important; 
-        border: 1px solid #30363d !important; /* Subtle divider style */
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    div[data-testid="stMetricLabel"] p {
-        color: #8b949e !important; 
-        font-size: 12px !important;
-        font-weight: 600 !important; 
-        text-transform: uppercase; 
-        letter-spacing: 0.05em;
-    }
-    div[data-testid="stMetricValue"] {
-        color: #f0f6fc !important; 
-        font-size: 24px !important; 
-        font-weight: 700 !important;
+    /* This forces almost all text in the app to be readable off-white */
+    html, body, [class*="css"], .stMarkdown, p, h1, h2, h3, h4, h5, h6, span {
+        color: #e0e6ed !important; 
     }
 
-    /* ── TABS (Modern Pill Style) ── */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: transparent !important;
+    /* ── METRIC CARDS (The Small Boxes) ── */
+    div[data-testid="stMetric"] {
+        background: #1c2128 !important; 
+        border: 1px solid #444c56 !important;
+        border-radius: 10px !important;
+        padding: 15px !important;
     }
-    .stTabs [data-baseweb="tab"] {
-        background-color: #161b22 !important;
-        border-radius: 6px 6px 0 0 !important;
-        border: 1px solid #30363d !important;
-        border-bottom: none !important;
-        padding: 8px 16px !important;
-        color: #8b949e !important;
+    div[data-testid="stMetricLabel"] p {
+        color: #adbac7 !important; /* Soft grey for labels */
+        font-size: 13px !important;
+        font-weight: 600 !important;
     }
-    .stTabs [aria-selected="true"] {
-        background-color: #1f6feb !important; /* Standard "Financial Blue" */
-        color: white !important;
-        border-color: #1f6feb !important;
+    div[data-testid="stMetricValue"] {
+        color: #ffffff !important; /* Pure white for the numbers */
+        font-size: 28px !important;
     }
 
     /* ── SIDEBAR ── */
     section[data-testid="stSidebar"] {
-        background-color: #0d1117 !important;
-        border-right: 1px solid #30363d !important;
+        background-color: #161b22 !important;
+        border-right: 1px solid #444c56 !important;
+    }
+    section[data-testid="stSidebar"] * {
+        color: #adbac7 !important;
     }
 
-    /* ── BUTTONS ── */
-    .stButton > button {
-        background-color: #238636 !important; /* Success Green */
-        color: white !important;
-        border-radius: 6px !important;
-        border: none !important;
-        font-weight: 600 !important;
-        width: 100%;
+    /* ── TABS (Fixing the "Invisible Tab" issue) ── */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #161b22 !important;
+        padding: 5px;
+        border-radius: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        color: #adbac7 !important;
+    }
+    .stTabs [aria-selected="true"] {
+        color: #ffffff !important;
+        background-color: #21262d !important;
+        border-bottom: 2px solid #58a6ff !important;
+    }
+
+    /* ── DATA TABLES ── */
+    .stDataFrame, div[data-testid="stTable"] {
+        background-color: #1c2128 !important;
+        border: 1px solid #444c56 !important;
+    }
+
+    /* ── INPUT BOXES ── */
+    input, select, textarea {
+        color: #ffffff !important;
+        background-color: #0d1117 !important;
     }
     </style>
 """, unsafe_allow_html=True)
