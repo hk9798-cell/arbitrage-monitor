@@ -11,59 +11,271 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 
 st.markdown("""
     <style>
-    .main { background-color: #f0f2f6; }
-    label[data-testid="stWidgetLabel"] p { font-weight: bold !important; font-size: 14px !important; }
-    div[data-testid="stMetricLabel"] p  { font-weight: bold !important; font-size: 13px !important; color: #333 !important; }
-    div[data-testid="stMetricValue"]    { font-size: 24px; color: #1f77b4; font-weight: bold; }
-    div[data-testid="stMetric"]         { background: #ffffff; border-radius: 10px; padding: 12px 16px;
-                                          border: 1px solid #dee2e6; }
-    .stTabs [data-baseweb="tab-list"]   { background-color: #e9ecef; border-radius: 8px; padding: 4px; }
-    .stTabs [data-baseweb="tab"]        { border-radius: 6px; font-weight: 600; color: #495057; }
-    .stTabs [aria-selected="true"]      { background-color: #1f77b4 !important; color: white !important; }
+    /* ── GOOGLE FONT IMPORT ── */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    /* ── GLOBAL ── */
+    html, body, [class*="css"], .stApp {
+        font-family: 'Inter', sans-serif !important;
+        background-color: #f4f6f9 !important;
+        color: #1a1a2e !important;
+    }
+
+    /* ── SIDEBAR ── */
+    section[data-testid="stSidebar"] {
+        background-color: #1a1a2e !important;
+        border-right: 3px solid #e8eaf0 !important;
+    }
+    section[data-testid="stSidebar"] * {
+        color: #e0e0e0 !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] .stMarkdown p {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+    section[data-testid="stSidebar"] .stCaption p {
+        color: #9e9e9e !important;
+        font-size: 11px !important;
+    }
+    section[data-testid="stSidebar"] .stNumberInput input,
+    section[data-testid="stSidebar"] .stSelectbox > div > div {
+        background-color: #2d2d44 !important;
+        color: #ffffff !important;
+        border: 1px solid #3d3d5c !important;
+        border-radius: 8px !important;
+    }
+    /* Sidebar slider track */
+    section[data-testid="stSidebar"] .stSlider [data-baseweb="slider"] div[role="slider"] {
+        background-color: #4a90d9 !important;
+    }
+    /* Auto-refresh info box in sidebar */
+    section[data-testid="stSidebar"] .stInfo {
+        background-color: #2d2d44 !important;
+        border-color: #4a90d9 !important;
+    }
+
+    /* ── TABS ── */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #ffffff !important;
+        border-radius: 12px !important;
+        padding: 6px !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+        gap: 4px !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        color: #555 !important;
+        padding: 8px 18px !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #1a1a2e, #2d3561) !important;
+        color: #ffffff !important;
+        box-shadow: 0 2px 6px rgba(26,26,46,0.3) !important;
+    }
+    .stTabs [data-baseweb="tab-panel"] {
+        background-color: #f4f6f9 !important;
+        padding-top: 16px !important;
+    }
+
+    /* ── METRIC CARDS ── */
+    div[data-testid="stMetric"] {
+        background: #ffffff !important;
+        border-radius: 12px !important;
+        padding: 14px 18px !important;
+        border: none !important;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.07) !important;
+    }
+    div[data-testid="stMetricLabel"] p {
+        font-weight: 600 !important;
+        font-size: 11px !important;
+        color: #888 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.06em !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: 22px !important;
+        font-weight: 800 !important;
+        color: #1a1a2e !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+    div[data-testid="stMetricDelta"] {
+        font-size: 12px !important;
+        font-weight: 600 !important;
+    }
+
+    /* ── HEADINGS ── */
+    h1, h2, h3, h4 {
+        font-family: 'Inter', sans-serif !important;
+        color: #1a1a2e !important;
+        font-weight: 800 !important;
+    }
+    h1 { font-size: 1.9rem !important; }
+    h2 { font-size: 1.4rem !important; }
+    h3 { font-size: 1.1rem !important; }
+
+    /* ── PARAGRAPHS & LABELS ── */
+    p, li, span {
+        font-family: 'Inter', sans-serif !important;
+        color: #2c2c3e !important;
+    }
+    label[data-testid="stWidgetLabel"] p {
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        color: #444 !important;
+    }
+    .stCaption p {
+        color: #888 !important;
+        font-size: 12px !important;
+    }
+
+    /* ── INPUTS ── */
+    .stNumberInput input, .stTextInput input {
+        border-radius: 8px !important;
+        border: 1.5px solid #dde2ec !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 14px !important;
+        background: #ffffff !important;
+        color: #1a1a2e !important;
+        padding: 8px 12px !important;
+    }
+    .stSelectbox > div > div {
+        border-radius: 8px !important;
+        border: 1.5px solid #dde2ec !important;
+        background: #ffffff !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+
+    /* ── BUTTONS ── */
+    .stButton > button {
+        background: linear-gradient(135deg, #1a1a2e, #2d3561) !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        font-family: 'Inter', sans-serif !important;
+        border: none !important;
+        border-radius: 10px !important;
+        padding: 10px 24px !important;
+        font-size: 14px !important;
+        letter-spacing: 0.02em !important;
+        transition: all 0.2s ease !important;
+        box-shadow: 0 3px 10px rgba(26,26,46,0.25) !important;
+    }
+    .stButton > button:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 16px rgba(26,26,46,0.35) !important;
+    }
+
+    /* ── DATAFRAME ── */
+    .stDataFrame { border-radius: 12px !important; overflow: hidden !important;
+                   box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important; }
+    .stDataFrame thead th {
+        background-color: #1a1a2e !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        font-size: 13px !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+    .stDataFrame tbody tr:nth-child(even) { background-color: #f8f9fb !important; }
+    .stDataFrame tbody td {
+        font-size: 13px !important;
+        font-family: 'Inter', sans-serif !important;
+        color: #2c2c3e !important;
+    }
+
+    /* ── EXPANDER ── */
+    .streamlit-expanderHeader {
+        background-color: #ffffff !important;
+        border-radius: 10px !important;
+        font-weight: 700 !important;
+        font-family: 'Inter', sans-serif !important;
+        color: #1a1a2e !important;
+        border: 1px solid #e8eaf0 !important;
+    }
+    .streamlit-expanderContent {
+        background-color: #ffffff !important;
+        border: 1px solid #e8eaf0 !important;
+        border-radius: 0 0 10px 10px !important;
+    }
+
+    /* ── DIVIDER ── */
+    hr { border-color: #e8eaf0 !important; margin: 16px 0 !important; }
+
+    /* ── CUSTOM CARDS ── */
     .warning-box {
-        background-color: #fff3cd; border-left: 5px solid #ffc107;
-        padding: 10px 16px; border-radius: 6px; color: #856404;
-        font-weight: 500; margin-top: 8px;
+        background-color: #fffbeb;
+        border-left: 5px solid #f59e0b;
+        padding: 12px 18px; border-radius: 8px;
+        color: #92400e; font-weight: 500; margin-top: 8px;
+        font-family: 'Inter', sans-serif;
     }
     .nse-link-box {
-        background-color: #e8f4fd; border-left: 5px solid #1f77b4;
-        padding: 10px 16px; border-radius: 6px; color: #1a3a5c;
-        font-size: 14px; margin-top: 6px;
+        background-color: #eff6ff;
+        border-left: 5px solid #3b82f6;
+        padding: 12px 18px; border-radius: 8px;
+        color: #1e40af; font-size: 14px; margin-top: 6px;
+        font-family: 'Inter', sans-serif;
     }
-    .nse-link-box a { color: #1f77b4 !important; }
-    .strategy-card {
-        background-color: #ffffff; border-left: 5px solid #1f77b4;
-        padding: 12px 16px; border-radius: 8px; margin-bottom: 10px;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-    }
+    .nse-link-box a { color: #2563eb !important; font-weight: 600 !important; }
     .opp-card-green {
-        background: linear-gradient(135deg, #d4edda, #c3e6cb);
-        border-left: 6px solid #28a745; border-radius: 10px;
-        padding: 14px 18px; margin-bottom: 10px;
+        background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+        border-left: 6px solid #16a34a; border-radius: 12px;
+        padding: 16px 20px; margin-bottom: 12px;
+        box-shadow: 0 2px 10px rgba(22,163,74,0.12);
+        font-family: 'Inter', sans-serif;
     }
     .opp-card-red {
-        background: linear-gradient(135deg, #f8d7da, #f5c6cb);
-        border-left: 6px solid #dc3545; border-radius: 10px;
-        padding: 14px 18px; margin-bottom: 10px;
+        background: linear-gradient(135deg, #fff1f2, #ffe4e6);
+        border-left: 6px solid #dc2626; border-radius: 12px;
+        padding: 16px 20px; margin-bottom: 12px;
+        box-shadow: 0 2px 10px rgba(220,38,38,0.10);
+        font-family: 'Inter', sans-serif;
     }
     .opp-card-grey {
-        background: #f1f3f5; border-left: 6px solid #adb5bd; border-radius: 10px;
-        padding: 14px 18px; margin-bottom: 10px;
+        background: #f8f9fa; border-left: 6px solid #9ca3af;
+        border-radius: 12px; padding: 16px 20px; margin-bottom: 12px;
+        font-family: 'Inter', sans-serif;
     }
     .scanner-badge {
-        display:inline-block; padding:3px 10px; border-radius:12px;
-        font-size:12px; font-weight:700; margin-right:6px;
+        display: inline-block; padding: 3px 12px; border-radius: 20px;
+        font-size: 11px; font-weight: 700; margin-right: 6px;
+        font-family: 'Inter', sans-serif; letter-spacing: 0.03em;
     }
+
+    /* ── ALERT ANIMATIONS ── */
     @keyframes pulse-green {
-        0%,100% { box-shadow: 0 0 0 0 rgba(40,167,69,0.4); }
-        50%      { box-shadow: 0 0 0 8px rgba(40,167,69,0); }
+        0%,100% { box-shadow: 0 0 0 0 rgba(22,163,74,0.4); }
+        50%      { box-shadow: 0 0 0 10px rgba(22,163,74,0); }
     }
     @keyframes pulse-red {
-        0%,100% { box-shadow: 0 0 0 0 rgba(220,53,69,0.4); }
-        50%      { box-shadow: 0 0 0 8px rgba(220,53,69,0); }
+        0%,100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.4); }
+        50%      { box-shadow: 0 0 0 10px rgba(220,38,38,0); }
     }
-    .signal-pulse-green { animation: pulse-green 2s infinite; }
-    .signal-pulse-red   { animation: pulse-red   2s infinite; }
+    .signal-pulse-green { animation: pulse-green 2s infinite; border-radius: 12px; }
+    .signal-pulse-red   { animation: pulse-red   2s infinite; border-radius: 12px; }
+
+    /* ── MULTISELECT TAGS ── */
+    span[data-baseweb="tag"] {
+        background-color: #1a1a2e !important;
+        border-radius: 20px !important;
+    }
+    span[data-baseweb="tag"] span { color: #ffffff !important; font-weight: 600 !important; }
+
+    /* ── INFO / SUCCESS / WARNING BOXES ── */
+    .stInfo    { background-color: #eff6ff !important; border-color: #3b82f6 !important;
+                 border-radius: 10px !important; color: #1e40af !important; }
+    .stSuccess { background-color: #f0fdf4 !important; border-color: #16a34a !important;
+                 border-radius: 10px !important; }
+    .stWarning { background-color: #fffbeb !important; border-color: #f59e0b !important;
+                 border-radius: 10px !important; }
+    .stError   { background-color: #fff1f2 !important; border-color: #dc2626 !important;
+                 border-radius: 10px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -100,7 +312,7 @@ st.markdown("""
 <div style="display:flex; align-items:center; gap:16px; margin-bottom:4px;">
   <span style="font-size:2rem;">🏛️</span>
   <div>
-    <h1 style="margin:0; font-size:1.8rem; font-weight:900; color:#1f77b4;
+    <h1 style="margin:0; font-size:1.9rem; font-weight:900; color:#1a1a2e;
                letter-spacing:-0.02em;">Cross-Asset Arbitrage Opportunity Monitor</h1>
     <p style="margin:0; font-size:13px; color:#6c757d;">
       IIT Roorkee &nbsp;·&nbsp; Department of Management Studies &nbsp;·&nbsp;
@@ -152,29 +364,29 @@ with st.spinner(""):
     ticker_data = get_ticker_bar_data()
 
 now_str = datetime.datetime.now().strftime("%H:%M:%S")
-ticker_html = '''<div style="background:#ffffff;
-    border:2px solid #1f77b4; border-radius:10px; padding:10px 20px;
+ticker_html = '''<div style="background:#1a1a2e;
+    border-radius:12px; padding:12px 24px;
     margin-bottom:16px; display:flex; gap:0; flex-wrap:wrap; align-items:center;
-    box-shadow: 0 2px 8px rgba(31,119,180,0.15);">
-    <span style="font-size:11px;color:#1f77b4;font-weight:800;
-          margin-right:20px;letter-spacing:0.1em;">● LIVE MARKET</span>'''
+    box-shadow: 0 4px 14px rgba(26,26,46,0.18);">
+    <span style="font-size:10px;color:#9ca3af;font-weight:700;
+          margin-right:24px;letter-spacing:0.12em;font-family:Inter,sans-serif;">● LIVE MARKET</span>'''
 
 for asset_name, d in ticker_data.items():
     color  = "#22c55e" if d["chg"] >= 0 else "#ef4444"
     arrow  = "▲" if d["chg"] >= 0 else "▼"
     prefix = "₹" if asset_name != "USD/INR" else ""
     ticker_html += (
-        '<span style="font-size:13px;font-weight:700;color:#212529;'
-        'margin-right:24px;display:inline-flex;align-items:center;gap:5px;">'
-        '<span style="color:#1f77b4;font-size:12px;font-weight:800;">{n}&nbsp;</span>'
+        '<span style="font-size:13px;font-weight:700;color:#f1f5f9;'
+        'margin-right:28px;display:inline-flex;align-items:center;gap:6px;font-family:Inter,sans-serif;">'
+        '<span style="color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:0.05em;">{n}&nbsp;</span>'
         '{p}{v:,.2f}'
-        '<span style="color:{c};font-size:12px;font-weight:600;">&nbsp;{a} {p2}{chg:.2f} ({pct:.2f}%)</span>'
+        '<span style="color:{c};font-size:11px;font-weight:600;font-family:Inter,sans-serif;">&nbsp;{a}{p2}{chg:.2f} ({pct:.2f}%)</span>'
         '</span>'.format(
             n=asset_name, p=prefix, v=d["price"],
             c=color, a=arrow, p2=prefix, chg=abs(d["chg"]), pct=abs(d["chg_pct"]))
     )
 
-ticker_html += '<span style="margin-left:auto;font-size:11px;color:#6c757d;">Updated: {t}</span></div>'.format(t=now_str)
+ticker_html += '<span style="margin-left:auto;font-size:10px;color:#64748b;font-family:Inter,sans-serif;">🕐 {t}</span></div>'.format(t=now_str)
 st.markdown(ticker_html, unsafe_allow_html=True)
 
 
@@ -502,13 +714,13 @@ with tab0:
     profitable_found = sum(1 for o in opportunities if o["profitable"])
 
     if profitable_found > 0:
-        banner_col = "#28a745"
+        banner_col = "#16a34a"
         banner_txt = "✅ Found {} Profitable Arbitrage {} Across {} Assets".format(
             profitable_found,
             "Opportunity" if profitable_found == 1 else "Opportunities",
             len(scan_assets))
     else:
-        banner_col = "#6c757d"
+        banner_col = "#6b7280"
         banner_txt = "⚪ No Profitable Opportunities Found — Markets Are Efficient"
 
     st.markdown(
@@ -550,7 +762,7 @@ with tab0:
                 "Futures Basis":        "#7c3aed",
                 "Interest Rate Parity": "#0891b2",
             }
-            sc = strategy_colors.get(opp["strategy"], "#6c757d")
+            sc = strategy_colors.get(opp["strategy"], "#6b7280")
 
             st.markdown(
                 '<div class="{cls}">'
@@ -596,7 +808,7 @@ with tab0:
             labels    = ["{} {}".format(o["asset"], o["strategy"][:3]) for o in opportunities]
             net_vals  = [o["net_pnl"] for o in opportunities]
             ann_vals  = [o["ann_return"] for o in opportunities]
-            colors    = ["#28a745" if o["profitable"] else "#adb5bd" for o in opportunities]
+            colors    = ["#16a34a" if o["profitable"] else "#adb5bd" for o in opportunities]
 
             fig_scan = go.Figure()
             fig_scan.add_trace(go.Bar(
@@ -615,13 +827,13 @@ with tab0:
             fig_scan.update_layout(
                 title="Net P&L & Annualised Return — All Scanned Opportunities",
                 xaxis=dict(title="Strategy · Asset"),
-                yaxis=dict(title=dict(text="Net P&L (₹)", font=dict(color="#28a745")),
+                yaxis=dict(title=dict(text="Net P&L (₹)", font=dict(color="#16a34a")),
                            tickformat=",.0f"),
                 yaxis2=dict(title=dict(text="Ann. Return (%)", font=dict(color="#f59e0b")),
                             overlaying="y", side="right", tickformat=".1f"),
                 height=380, margin=dict(t=45, b=40, l=10, r=10),
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                plot_bgcolor="#f8f9fa", paper_bgcolor="white", barmode="group")
+                plot_bgcolor="#ffffff", paper_bgcolor="#f4f6f9", barmode="group")
             st.plotly_chart(fig_scan, use_container_width=True)
 
         # ── Exportable summary table ───────────────────────────────────────
@@ -796,15 +1008,15 @@ with tab1:
 
     if spread_per_unit > arb_threshold:
         signal_line, signal_color, strategy_desc, signal_type = \
-            "✅ CONVERSION ARBITRAGE DETECTED", "#28a745", "Buy Spot  ·  Buy Put  ·  Sell Call", "conversion"
+            "✅ CONVERSION ARBITRAGE DETECTED", "#16a34a", "Buy Spot  ·  Buy Put  ·  Sell Call", "conversion"
         net_pnl = gross_spread - total_friction
     elif spread_per_unit < -arb_threshold:
         signal_line, signal_color, strategy_desc, signal_type = \
-            "🔴 REVERSAL ARBITRAGE DETECTED", "#dc3545", "Short Spot  ·  Sell Put  ·  Buy Call", "reversal"
+            "🔴 REVERSAL ARBITRAGE DETECTED", "#dc2626", "Short Spot  ·  Sell Put  ·  Buy Call", "reversal"
         net_pnl = gross_spread - total_friction
     else:
         signal_line, signal_color, strategy_desc, signal_type = \
-            "⚪ MARKET IS EFFICIENT — No Arbitrage", "#6c757d", "No Action", "none"
+            "⚪ MARKET IS EFFICIENT — No Arbitrage", "#6b7280", "No Action", "none"
         net_pnl = -total_friction
 
     pnl_profitable = net_pnl > 0
@@ -930,7 +1142,7 @@ with tab1:
                         range=[-net_pad, net_pad], showgrid=True, gridcolor="#e9ecef"),
             height=370, margin=dict(t=45, b=40, l=10, r=10),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            hovermode="x unified", plot_bgcolor="#f8f9fa", paper_bgcolor="white")
+            hovermode="x unified", plot_bgcolor="#ffffff", paper_bgcolor="#f4f6f9")
         st.plotly_chart(fig, use_container_width=True)
         st.caption("📌 Dotted = individual legs (left axis). Solid = Net P&L after costs (right axis). The flat line proves the arbitrage is locked.")
 
@@ -1038,13 +1250,13 @@ with tab2:
     irp_threshold = f_theory * (arb_threshold_pct / 100)
     if irp_gap > irp_threshold:
         irp_signal = "🔴 FORWARD TOO EXPENSIVE — Borrow USD · Invest INR · Sell Forward"
-        irp_color  = "#dc3545"
+        irp_color  = "#dc2626"
     elif irp_gap < -irp_threshold:
         irp_signal = "✅ FORWARD TOO CHEAP — Borrow INR · Invest USD · Buy Forward"
-        irp_color  = "#28a745"
+        irp_color  = "#16a34a"
     else:
         irp_signal = "⚪ IRP HOLDS — No Covered Arbitrage Opportunity"
-        irp_color  = "#6c757d"
+        irp_color  = "#6b7280"
 
     st.markdown("---")
     i1, i2, i3, i4, i5 = st.columns(5)
@@ -1103,7 +1315,7 @@ with tab2:
         xaxis=dict(title="Market Forward Rate (USD/INR)", tickformat=".4f"),
         yaxis=dict(title="Net Profit (₹)", tickformat=",.0f"),
         height=320, margin=dict(t=40,b=30,l=10,r=10),
-        plot_bgcolor="#f8f9fa", paper_bgcolor="white", showlegend=False)
+        plot_bgcolor="#ffffff", paper_bgcolor="#f4f6f9", showlegend=False)
     st.plotly_chart(fig_irp, use_container_width=True)
     st.caption("Green = Theoretical forward (no-arbitrage). Red = current market forward. Width of gap = arbitrage opportunity size.")
 
@@ -1188,15 +1400,15 @@ with tab3:
 
     if fb_basis > fb_threshold:
         fb_signal = "✅ CASH & CARRY — Buy Spot · Sell Futures · Deliver at Expiry"
-        fb_color  = "#28a745"
+        fb_color  = "#16a34a"
         fb_strategy = "Cash & Carry"
     elif fb_basis < -fb_threshold:
         fb_signal = "🔴 REVERSE CASH & CARRY — Short Spot · Buy Futures · Accept Delivery"
-        fb_color  = "#dc3545"
+        fb_color  = "#dc2626"
         fb_strategy = "Reverse Cash & Carry"
     else:
         fb_signal = "⚪ BASIS FAIR — No Futures Arbitrage Opportunity"
-        fb_color  = "#6c757d"
+        fb_color  = "#6b7280"
         fb_strategy = "No Trade"
 
     st.markdown("---")
@@ -1259,9 +1471,9 @@ with tab3:
 
     fig_fb = go.Figure()
     fig_fb.add_trace(go.Scatter(x=days_arr[::-1], y=fair_arr[::-1], mode="lines",
-                                name="Fair Futures F*", line=dict(color="#28a745", width=2)))
+                                name="Fair Futures F*", line=dict(color="#16a34a", width=2)))
     fig_fb.add_trace(go.Scatter(x=[fb_days, 0], y=[fb_mkt, fb_mkt], mode="lines",
-                                name="Market Futures (entry)", line=dict(color="#dc3545", width=2, dash="dash")))
+                                name="Market Futures (entry)", line=dict(color="#dc2626", width=2, dash="dash")))
     fig_fb.add_trace(go.Scatter(x=days_arr[::-1], y=basis_arr[::-1], mode="lines",
                                 name="Basis (Fmkt − F*)", line=dict(color="#ff7f0e", width=1.5, dash="dot"),
                                 yaxis="y2"))
@@ -1269,12 +1481,12 @@ with tab3:
     fig_fb.update_layout(
         title="Basis Decay: Fair Futures Converges to Market Price at Expiry",
         xaxis=dict(title="Days Remaining to Expiry", autorange="reversed"),
-        yaxis=dict(title=dict(text="Price (₹)", font=dict(color="#28a745")), tickformat=",.2f"),
+        yaxis=dict(title=dict(text="Price (₹)", font=dict(color="#16a34a")), tickformat=",.2f"),
         yaxis2=dict(title=dict(text="Basis (₹)", font=dict(color="#ff7f0e")),
                     overlaying="y", side="right", tickformat=",.2f"),
         height=320, margin=dict(t=40,b=30,l=10,r=10),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        plot_bgcolor="#f8f9fa", paper_bgcolor="white")
+        plot_bgcolor="#ffffff", paper_bgcolor="#f4f6f9")
     st.plotly_chart(fig_fb, use_container_width=True)
     st.caption("As time passes, F* rises (cost of carry accumulates) and converges to F_mkt at expiry. "
                "The basis (orange dotted) decays to zero — this convergence locks in the arbitrage profit.")
