@@ -625,75 +625,43 @@ with tab0:
             net_vals  = [o["net_pnl"] for o in opportunities]
             ann_vals  = [o["ann_return"] for o in opportunities]
             
-            # Use specific "Fintech" colors for bars
-            colors    = ["#22c55e" if o["profitable"] else "#4b5563" for o in opportunities]
+            # High-contrast colors
+            colors = ["#238636" if v > 0 else "#da3633" for v in net_vals]
 
             fig_scan = go.Figure()
             
-            # Primary Axis: Net P&L
+            # Bar Chart for P&L
             fig_scan.add_trace(go.Bar(
-                name="Net P&L (₹)", 
-                x=labels, 
-                y=net_vals,
+                name="Net P&L (₹)", x=labels, y=net_vals,
                 marker_color=colors,
-                marker_line=dict(width=1, color="#30363d"),
                 text=["₹{:,.0f}".format(v) for v in net_vals],
                 textposition="outside",
-                textfont=dict(color="#f0f6fc", size=11), # Pure white text for numbers
+                textfont=dict(color="#ffffff"),
                 yaxis="y1"
             ))
             
-            # Secondary Axis: Annualised Return
+            # Line Chart for Annualised Return
             fig_scan.add_trace(go.Scatter(
-                name="Ann. Return (%)", 
-                x=labels, 
-                y=ann_vals,
+                name="Ann. Return (%)", x=labels, y=ann_vals,
                 mode="lines+markers+text",
-                line=dict(color="#f59e0b", width=3, dash='dot'),
-                marker=dict(size=10, color="#f59e0b", symbol='diamond'),
+                line=dict(color="#f59e0b", width=3),
                 text=["{:.1f}%".format(v) for v in ann_vals],
                 textposition="top center",
-                textfont=dict(color="#f59e0b", size=12, fontWeight='bold'),
+                textfont=dict(color="#f59e0b", fontWeight='bold'),
                 yaxis="y2"
             ))
 
             fig_scan.update_layout(
-                title=dict(
-                    text="<b>Arbitrage Analysis: Net P&L & Annualised Returns</b>",
-                    font=dict(size=20, color="#ffffff") # High visibility title
-                ),
-                xaxis=dict(
-                    title="Strategy & Asset",
-                    tickfont=dict(color="#8b949e"),
-                    gridcolor="#30363d"
-                ),
-                yaxis=dict(
-                    title=dict(text="Net P&L (₹)", font=dict(color="#22c55e", size=14)),
-                    tickfont=dict(color="#8b949e"),
-                    tickformat=",.0f",
-                    gridcolor="#30363d", # Darker grid lines
-                    zerolinecolor="#444c56"
-                ),
-                yaxis2=dict(
-                    title=dict(text="Ann. Return (%)", font=dict(color="#f59e0b", size=14)),
-                    overlaying="y",
-                    side="right",
-                    tickfont=dict(color="#8b949e"),
-                    tickformat=".1f",
-                    gridcolor="rgba(0,0,0,0)" # Hide secondary grid to avoid clutter
-                ),
-                height=450,
-                margin=dict(t=80, b=40, l=10, r=10),
-                legend=dict(
-                    orientation="h", 
-                    yanchor="bottom", y=1.1, 
-                    xanchor="right", x=1,
-                    font=dict(color="#f0f6fc")
-                ),
-                plot_bgcolor="rgba(0,0,0,0)", # Transparent background
+                template="plotly_dark", # Forces dark theme
                 paper_bgcolor="rgba(0,0,0,0)",
-                barmode="group",
-                template="plotly_dark" # Essential for dark mode compatibility
+                plot_bgcolor="rgba(0,0,0,0)",
+                title=dict(text="<b>Arbitrage Yield Analysis</b>", font=dict(size=20, color="#ffffff")),
+                xaxis=dict(gridcolor="#30363d", tickfont=dict(color="#8b949e")),
+                yaxis=dict(title="Net P&L (₹)", gridcolor="#30363d", tickfont=dict(color="#8b949e")),
+                yaxis2=dict(title="Ann. Return (%)", overlaying="y", side="right", tickfont=dict(color="#f59e0b")),
+                legend=dict(font=dict(color="#ffffff")),
+                margin=dict(t=80, b=40, l=10, r=10),
+                barmode="group"
             )
             
             st.plotly_chart(fig_scan, use_container_width=True)
