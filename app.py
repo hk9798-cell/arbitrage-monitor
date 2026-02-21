@@ -10,31 +10,56 @@ import datetime
 st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", page_icon="🏛️")
 
 st.markdown("""
+    I understand the frustration. The reason the Asset names and Brokerage inputs "disappeared" is that Streamlit's input widgets (like selectboxes and text inputs) have an internal white background with black text by default. When we forced the background dark, the text stayed dark, making it invisible.
+
+To fix this once and for all, replace the entire <style> block (Lines 12–94) with this "Total Visibility" version. It includes the specific code needed to make the dropdown menus and input fields readable.
+
+1. The Total Visibility CSS (Replace Lines 12–94)
+Python
+st.markdown("""
     <style>
-    /* ── 1. GLOBAL BACKGROUND ── */
-    [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+    /* 1. GLOBAL BACKGROUND & SIDEBAR */
+    [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stSidebar"] {
         background-color: #0d1117 !important;
     }
 
-    /* ── 2. THE ULTIMATE VISIBILITY FIX (FOR HEADINGS & LABELS) ── */
-    /* This forces ALL text elements to be white/off-white */
+    /* 2. UNIVERSAL TEXT (Headings & Labels) */
     h1, h2, h3, h4, h5, h6, p, span, label, li, .stMarkdown {
         color: #ffffff !important;
     }
 
-    /* Specifically target Streamlit Widget Labels (the ones you marked) */
-    [data-testid="stWidgetLabel"] p, [data-testid="stMetricLabel"] p {
-        color: #adbac7 !important; /* A slightly softer grey-white for labels */
-        font-weight: 600 !important;
-        font-size: 14px !important;
+    /* 3. INPUT BOXES & DROPDOWNS (This fixes the missing Asset/Brokerage text) */
+    /* Target the container, the input, and the dropdown menu */
+    div[data-baseweb="select"] > div, 
+    div[data-testid="stSelectbox"] div, 
+    div[data-testid="stNumberInput"] input {
+        background-color: #1c2128 !important;
+        color: #ffffff !important;
+        border: 1px solid #30363d !important;
+    }
+    
+    /* Target the text inside the dropdown list */
+    ul[role="listbox"] li {
+        color: #000000 !important; /* Keep list text black so it's readable on white background */
     }
 
-    /* ── 3. METRIC CARDS ── */
+    /* 4. SIDEBAR SPECIFIC LABELS */
+    [data-testid="stWidgetLabel"] p {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+    }
+
+    /* 5. METRIC CARDS */
     div[data-testid="stMetric"] {
         background: #161b22 !important; 
         border: 1px solid #30363d !important;
         border-radius: 12px !important;
         padding: 15px !important; 
+    }
+    div[data-testid="stMetricLabel"] p {
+        color: #8b949e !important;
+        font-size: 12px !important;
+        text-transform: uppercase;
     }
     div[data-testid="stMetricValue"] {
         color: #ffffff !important; 
@@ -42,7 +67,7 @@ st.markdown("""
         font-weight: 700 !important;
     }
 
-    /* ── 4. TABS ── */
+    /* 6. TABS */
     .stTabs [data-baseweb="tab-list"] {
         gap: 10px;
     }
@@ -56,16 +81,6 @@ st.markdown("""
     .stTabs [aria-selected="true"] {
         background-color: #1f6feb !important;
         color: white !important;
-        border: 1px solid #1f6feb !important;
-    }
-
-    /* ── 5. SIDEBAR FIX ── */
-    [data-testid="stSidebar"] {
-        background-color: #0d1117 !important;
-        border-right: 1px solid #30363d !important;
-    }
-    [data-testid="stSidebar"] * {
-        color: #ffffff !important;
     }
     </style>
 """, unsafe_allow_html=True)
