@@ -11,81 +11,52 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 
 st.markdown("""
     <style>
-    /* ── GLOBAL THEME ── */
+    /* ── GLOBAL THEME & FORCE READABILITY ── */
     [data-testid="stAppViewContainer"] {
-        background-color: #0e1117; /* Deeper, standard dark background */
+        background-color: #0d1117 !important;
     }
     
-    /* ── METRIC CARDS ── */
+    /* FORCE TEXT VISIBILITY: This is the fix for "can't read anything" */
+    p, span, label, .stMarkdown, .stText, [data-testid="stWidgetLabel"] p, li {
+        color: #e6edf3 !important; /* High contrast off-white */
+    }
+
+    /* Force all Headings to be Pure White */
+    h1, h2, h3, h4, h5, h6 {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+
+    /* Metric Cards - High Visibility */
     div[data-testid="stMetric"] {
         background: #161b22 !important; 
-        border-radius: 8px !important;
+        border: 1px solid #30363d !important;
+        border-radius: 10px !important;
         padding: 15px !important; 
-        border: 1px solid #30363d !important; /* Subtle border */
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     div[data-testid="stMetricLabel"] p {
         color: #8b949e !important; 
         font-size: 12px !important;
-        font-weight: 500 !important; 
-        text-transform: uppercase; 
-        letter-spacing: 0.05em;
-    }
-    div[data-testid="stMetricValue"] {
-        color: #f0f6fc !important; 
-        font-size: 24px !important; 
         font-weight: 600 !important;
     }
+    div[data-testid="stMetricValue"] {
+        color: #ffffff !important; 
+        font-size: 28px !important;
+        font-weight: 700 !important;
+    }
 
-    /* ── TABS ── */
+    /* Tabs Styling */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
         background-color: transparent !important;
     }
     .stTabs [data-baseweb="tab"] {
-        background-color: #161b22 !important;
-        border-radius: 6px 6px 0 0 !important;
+        background-color: #1c2128 !important;
         border: 1px solid #30363d !important;
-        border-bottom: none !important;
-        padding: 8px 16px !important;
         color: #8b949e !important;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #1f6feb !important; /* Brighter, professional blue */
+        background-color: #1f6feb !important;
         color: white !important;
-        border-color: #1f6feb !important;
-    }
-
-    /* ── SIDEBAR ── */
-    section[data-testid="stSidebar"] {
-        background-color: #0d1117 !important;
-        border-right: 1px solid #30363d !important;
-    }
-
-    /* ── BUTTONS ── */
-    .stButton > button {
-        background-color: #238636 !important; /* Success green for trading */
-        color: white !important;
-        border-radius: 6px !important;
-        border: none !important;
-        font-weight: 600 !important;
-        transition: 0.2s;
-    }
-    .stButton > button:hover {
-        background-color: #2ea043 !important;
-        box-shadow: 0 0 10px rgba(46, 160, 67, 0.4);
-    }
-
-    /* ── DATAFRAME & TABLES ── */
-    .stDataFrame {
-        border: 1px solid #30363d !important;
-        border-radius: 8px !important;
-    }
-    
-    /* ── CUSTOM BOXES ── */
-    .warning-box {
-        background-color: #261b05; border: 1px solid #845c09;
-        padding: 12px; border-radius: 8px; color: #e3b341;
     }
     </style>
 """, unsafe_allow_html=True)
