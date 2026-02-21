@@ -705,7 +705,6 @@ with tab0:
                 barmode="group",
                 template="plotly_dark" # Essential for dark mode compatibility
             )
-            
             st.plotly_chart(fig_scan, use_container_width=True)
 
         # ── Exportable summary table ───────────────────────────────────────
