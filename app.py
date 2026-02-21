@@ -12,30 +12,20 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 st.markdown("""
     <style>
     /* ── GLOBAL THEME ── */
-    [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+    [data-testid="stAppViewContainer"] {
         background-color: #0d1117 !important;
     }
     
-    /* ── THE VISIBILITY FIX ── */
-    /* This forces all text, labels, and descriptions to be readable Off-White */
-    p, span, label, .stMarkdown, .stText, [data-testid="stWidgetLabel"] p, li, div {
-        color: #e6edf3 !important;
-    }
-
-    /* Force all Headings to be Pure White */
-    h1, h2, h3, h4, h5, h6 {
-        color: #ffffff !important;
-        font-weight: 700 !important;
-    }
-
-    /* ── SIDEBAR (Quick Parameters) ── */
+    /* ── SIDEBAR FIX (Parameters Column) ── */
     [data-testid="stSidebar"] {
         background-color: #161b22 !important;
         border-right: 1px solid #30363d !important;
+        width: 300px !important;
     }
-    /* Ensure Sidebar text is specifically bright */
-    [data-testid="stSidebar"] * {
-        color: #ffffff !important;
+    /* Force Sidebar Text to be White/Visible */
+    [data-testid="stSidebar"] .stMarkdown, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label {
+        color: #e6edf3 !important;
+        font-weight: 500 !important;
     }
 
     /* ── METRIC CARDS ── */
@@ -43,29 +33,26 @@ st.markdown("""
         background: #161b22 !important; 
         border: 1px solid #30363d !important;
         border-radius: 12px !important;
-        padding: 15px !important; 
+        padding: 20px !important;
+        transition: transform 0.2s;
+    }
+    div[data-testid="stMetric"]:hover {
+        border-color: #1f6feb !important;
+        transform: translateY(-2px);
     }
     div[data-testid="stMetricLabel"] p {
-        color: #8b949e !important; /* Muted grey for labels */
-        font-size: 12px !important;
-        text-transform: uppercase;
+        color: #8b949e !important; font-size: 13px !important;
+        font-weight: 600 !important; text-transform: uppercase;
     }
     div[data-testid="stMetricValue"] {
-        color: #ffffff !important; /* White for large numbers */
-        font-size: 28px !important;
+        color: #ffffff !important; font-size: 30px !important;
     }
 
-    /* ── TABS ── */
-    .stTabs [data-baseweb="tab-list"] {
-        background-color: #1c2128 !important;
-        padding: 5px; border-radius: 8px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        color: #8b949e !important;
-    }
-    .stTabs [aria-selected="true"] {
+    /* ── INPUT BOXES (Side Column) ── */
+    .stNumberInput input, .stSelectbox div {
+        background-color: #0d1117 !important;
         color: white !important;
-        background-color: #1f6feb !important;
+        border: 1px solid #30363d !important;
     }
     </style>
 """, unsafe_allow_html=True)
