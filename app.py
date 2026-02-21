@@ -11,69 +11,77 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 
 st.markdown("""
     <style>
-    /* 1. APP & SIDEBAR BACKGROUND */
+    /* ── 1. MAIN APP & SIDEBAR BACKGROUND ── */
     [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stSidebar"] {
-        background-color: #0d1117 !important;
+        background-color: #0d1421 !important;
     }
 
-    /* 2. UNIVERSAL TEXT (Labels, Headings, Sidebar) */
-    h1, h2, h3, h4, h5, h6, p, span, label, li, .stMarkdown {
-        color: #ffffff !important;
+    /* ── 2. THE ULTIMATE DROPDOWN FIX (BaseWeb Portals) ── */
+    /* This targets the actual menu that pops up when you click a dropdown */
+    div[data-baseweb="popover"], div[role="listbox"] {
+        background-color: #1a2332 !important;
+        border: 1px solid #2d4a6b !important;
     }
 
-    /* 3. THE DROPDOWN "INVISIBLE ASSET" FIX */
-    /* This forces the text color INSIDE the box before you click it */
-    div[data-baseweb="select"] div {
-        color: #ffffff !important;
-    }
-
-    /* This targets the POP-UP menu (the Listbox) when you click it */
-    div[role="listbox"] {
-        background-color: #1c2128 !important; /* Dark background for the menu */
-        border: 1px solid #30363d !important;
-    }
-
-    /* This forces the ASSET NAMES (Nifty, Reliance, etc.) to be White */
-    div[role="option"] {
+    /* This forces the text of the ASSET NAMES (NIFTY, RELIANCE, etc.) to be white */
+    div[role="option"], div[role="option"] span, li[role="option"] {
         color: #ffffff !important;
         background-color: transparent !important;
     }
 
-    /* Highlight color when your mouse hovers over an asset name */
-    div[role="option"]:hover {
-        background-color: #1f6feb !important;
+    /* Highlight color when you hover over an option */
+    div[role="option"]:hover, li[role="option"]:hover {
+        background-color: #2563eb !important;
+    }
+
+    /* This targets the text color of the selection inside the box before clicking */
+    div[data-baseweb="select"] div {
         color: #ffffff !important;
     }
 
-    /* 4. INPUT BOXES (Brokerage, Lots, etc.) */
-    input {
-        color: #ffffff !important;
-        background-color: #1c2128 !important;
+    /* ── 3. UNIVERSAL TEXT & LABELS ── */
+    h1, h2, h3, h4, h5, h6, p, span, label, li, .stMarkdown {
+        color: #f1f5f9 !important;
     }
 
-    /* 5. METRIC CARDS */
+    /* ── 4. METRIC CARDS ── */
     div[data-testid="stMetric"] {
-        background: #161b22 !important; 
-        border: 1px solid #30363d !important;
-        border-radius: 12px !important;
+        background: #1a2332 !important; 
+        border: 1px solid #2d4a6b !important;
+        border-radius: 10px !important;
+        padding: 14px 18px !important;
     }
     div[data-testid="stMetricLabel"] p {
-        color: #8b949e !important;
+        color: #7fb3d3 !important;
+        font-weight: 700 !important;
+        text-transform: uppercase;
     }
     div[data-testid="stMetricValue"] {
         color: #ffffff !important; 
+        font-size: 26px !important;
     }
 
-    /* 6. TABS */
-    .stTabs [data-baseweb="tab-list"] { background-color: transparent !important; }
+    /* ── 5. TABS ── */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #1a2332 !important;
+        border: 1px solid #2d4a6b !important;
+        border-radius: 10px !important;
+    }
     .stTabs [data-baseweb="tab"] {
-        background-color: #1c2128 !important;
-        color: #adbac7 !important;
-        border-radius: 4px !important;
+        color: #7fb3d3 !important;
+        font-weight: 600 !important;
     }
     .stTabs [aria-selected="true"] {
         background-color: #2563eb !important;
-        color: white !important;
+        color: #ffffff !important;
+    }
+
+    /* ── 6. MULTISELECT TAGS ── */
+    span[data-baseweb="tag"] {
+        background-color: #2563eb !important;
+    }
+    span[data-baseweb="tag"] span {
+        color: #ffffff !important;
     }
     </style>
 """, unsafe_allow_html=True)
