@@ -11,78 +11,62 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 
 st.markdown("""
     <style>
+    /* ── GLOBAL THEME ── */
+    [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+        background-color: #0d1117 !important;
+    }
+    
+    /* ── THE VISIBILITY FIX ── */
+    /* This forces all text, labels, and descriptions to be readable Off-White */
+    p, span, label, .stMarkdown, .stText, [data-testid="stWidgetLabel"] p, li, div {
+        color: #e6edf3 !important;
+    }
+
+    /* Force all Headings to be Pure White */
+    h1, h2, h3, h4, h5, h6 {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+
+    /* ── SIDEBAR (Quick Parameters) ── */
+    [data-testid="stSidebar"] {
+        background-color: #161b22 !important;
+        border-right: 1px solid #30363d !important;
+    }
+    /* Ensure Sidebar text is specifically bright */
+    [data-testid="stSidebar"] * {
+        color: #ffffff !important;
+    }
+
     /* ── METRIC CARDS ── */
     div[data-testid="stMetric"] {
-        background: #1a2332 !important; border-radius:10px !important;
-        padding:14px 18px !important; border:1px solid #2d4a6b !important;
+        background: #161b22 !important; 
+        border: 1px solid #30363d !important;
+        border-radius: 12px !important;
+        padding: 15px !important; 
     }
     div[data-testid="stMetricLabel"] p {
-        color:#7fb3d3 !important; font-size:11px !important;
-        font-weight:700 !important; text-transform:uppercase; letter-spacing:0.08em;
+        color: #8b949e !important; /* Muted grey for labels */
+        font-size: 12px !important;
+        text-transform: uppercase;
     }
     div[data-testid="stMetricValue"] {
-        color:#ffffff !important; font-size:26px !important; font-weight:800 !important;
+        color: #ffffff !important; /* White for large numbers */
+        font-size: 28px !important;
     }
+
     /* ── TABS ── */
     .stTabs [data-baseweb="tab-list"] {
-        background-color:#1a2332 !important; border-radius:10px !important;
-        padding:4px !important; border:1px solid #2d4a6b !important;
+        background-color: #1c2128 !important;
+        padding: 5px; border-radius: 8px;
     }
     .stTabs [data-baseweb="tab"] {
-        border-radius:7px !important; font-weight:600 !important;
-        font-size:13px !important; color:#7fb3d3 !important; padding:8px 16px !important;
+        color: #8b949e !important;
     }
     .stTabs [aria-selected="true"] {
-        background-color:#2563eb !important; color:#ffffff !important;
+        color: white !important;
+        background-color: #1f6feb !important;
     }
-    /* ── SIDEBAR ── */
-    section[data-testid="stSidebar"] {
-        background-color:#0d1421 !important; border-right:1px solid #1e3a5f !important;
-    }
-    /* ── BUTTONS ── */
-    .stButton > button {
-        background-color:#2563eb !important; color:#ffffff !important;
-        font-weight:700 !important; border:none !important;
-        border-radius:8px !important; padding:10px 24px !important; font-size:14px !important;
-    }
-    .stButton > button:hover { background-color:#1d4ed8 !important; }
-    /* ── MULTISELECT TAGS ── */
-    span[data-baseweb="tag"] { background-color:#2563eb !important; border-radius:20px !important; }
-    span[data-baseweb="tag"] span { color:#ffffff !important; font-weight:600 !important; }
-    /* ── DATAFRAME ── */
-    .stDataFrame thead th {
-        background-color:#1a2332 !important; color:#7fb3d3 !important;
-        font-weight:700 !important; font-size:12px !important;
-    }
-    /* ── EXPANDER ── */
-    .streamlit-expanderHeader {
-        background-color:#1a2332 !important; color:#e2e8f0 !important;
-        font-weight:600 !important; border-radius:8px !important; border:1px solid #2d4a6b !important;
-    }
-    .streamlit-expanderContent {
-        background-color:#131c2b !important; border:1px solid #2d4a6b !important;
-    }
-    /* ── CUSTOM BOXES ── */
-    .warning-box {
-        background-color:#2d1a00; border-left:4px solid #f59e0b;
-        padding:10px 14px; border-radius:6px; color:#fbbf24; font-size:13px;
-    }
-    .nse-link-box {
-        background-color:#0d1e35; border-left:4px solid #3b82f6;
-        padding:10px 14px; border-radius:6px; color:#93c5fd; font-size:13px;
-    }
-    .nse-link-box a { color:#60a5fa !important; font-weight:600; }
-    /* ── SCANNER BADGES ── */
-    .scanner-badge {
-        display:inline-block; padding:3px 10px; border-radius:20px;
-        font-size:11px; font-weight:700; margin-right:5px;
-    }
-    /* ── ANIMATIONS ── */
-    @keyframes pulse-green {
-        0%,100% { box-shadow:0 0 0 0 rgba(34,197,94,0.5); }
-        50%      { box-shadow:0 0 0 10px rgba(34,197,94,0); }
-    }
-    .signal-pulse-green { animation:pulse-green 2s infinite; border-radius:10px; }
     </style>
 """, unsafe_allow_html=True)
 
