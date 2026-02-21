@@ -11,67 +11,57 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 
 st.markdown("""
     <style>
-    /* ── GLOBAL THEME & TEXT COLOR ── */
-    [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
-        background-color: #0e1117 !important;
+    /* ── GLOBAL THEME & TEXT VISIBILITY ── */
+    [data-testid="stAppViewContainer"] {
+        background-color: #0d1117 !important;
     }
     
-    /* This forces almost all text in the app to be readable off-white */
-    html, body, [class*="css"], .stMarkdown, p, h1, h2, h3, h4, h5, h6, span {
-        color: #e0e6ed !important; 
+    /* Force all text (Paragraphs, Labels, Spans) to be Off-White */
+    p, span, label, .stMarkdown, .stText, [data-testid="stWidgetLabel"] p {
+        color: #e6edf3 !important;
     }
 
-    /* ── METRIC CARDS (The Small Boxes) ── */
+    /* Force Headings to be Pure White */
+    h1, h2, h3, h4 {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+
+    /* ── METRIC CARDS ── */
     div[data-testid="stMetric"] {
-        background: #1c2128 !important; 
-        border: 1px solid #444c56 !important;
+        background: #161b22 !important; 
         border-radius: 10px !important;
-        padding: 15px !important;
+        padding: 15px !important; 
+        border: 1px solid #30363d !important;
     }
     div[data-testid="stMetricLabel"] p {
-        color: #adbac7 !important; /* Soft grey for labels */
-        font-size: 13px !important;
-        font-weight: 600 !important;
+        color: #8b949e !important; 
+        font-size: 12px !important;
     }
     div[data-testid="stMetricValue"] {
-        color: #ffffff !important; /* Pure white for the numbers */
+        color: #ffffff !important; 
         font-size: 28px !important;
     }
 
-    /* ── SIDEBAR ── */
-    section[data-testid="stSidebar"] {
-        background-color: #161b22 !important;
-        border-right: 1px solid #444c56 !important;
-    }
-    section[data-testid="stSidebar"] * {
-        color: #adbac7 !important;
-    }
-
-    /* ── TABS (Fixing the "Invisible Tab" issue) ── */
+    /* ── TABS ── */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: #161b22 !important;
-        padding: 5px;
-        border-radius: 8px;
+        gap: 8px;
+        background-color: transparent !important;
     }
     .stTabs [data-baseweb="tab"] {
-        color: #adbac7 !important;
+        background-color: #1c2128 !important;
+        border: 1px solid #30363d !important;
+        color: #8b949e !important;
     }
     .stTabs [aria-selected="true"] {
-        color: #ffffff !important;
-        background-color: #21262d !important;
-        border-bottom: 2px solid #58a6ff !important;
+        background-color: #1f6feb !important;
+        color: white !important;
     }
 
-    /* ── DATA TABLES ── */
-    .stDataFrame, div[data-testid="stTable"] {
-        background-color: #1c2128 !important;
-        border: 1px solid #444c56 !important;
-    }
-
-    /* ── INPUT BOXES ── */
-    input, select, textarea {
-        color: #ffffff !important;
+    /* ── TABLES ── */
+    .stDataFrame, [data-testid="stTable"] {
         background-color: #0d1117 !important;
+        border: 1px solid #30363d !important;
     }
     </style>
 """, unsafe_allow_html=True)
