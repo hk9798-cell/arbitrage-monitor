@@ -11,58 +11,78 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 
 st.markdown("""
     <style>
-    /* ── GLOBAL THEME & TEXT VISIBILITY ── */
-    [data-testid="stAppViewContainer"] {
-        background-color: #0d1117 !important;
-    }
-    
-    /* Force all text (Paragraphs, Labels, Spans) to be Off-White */
-    p, span, label, .stMarkdown, .stText, [data-testid="stWidgetLabel"] p {
-        color: #e6edf3 !important;
-    }
-
-    /* Force Headings to be Pure White */
-    h1, h2, h3, h4 {
-        color: #ffffff !important;
-        font-weight: 700 !important;
-    }
-
     /* ── METRIC CARDS ── */
     div[data-testid="stMetric"] {
-        background: #161b22 !important; 
-        border-radius: 10px !important;
-        padding: 15px !important; 
-        border: 1px solid #30363d !important;
+        background: #1a2332 !important; border-radius:10px !important;
+        padding:14px 18px !important; border:1px solid #2d4a6b !important;
     }
     div[data-testid="stMetricLabel"] p {
-        color: #8b949e !important; 
-        font-size: 12px !important;
+        color:#7fb3d3 !important; font-size:11px !important;
+        font-weight:700 !important; text-transform:uppercase; letter-spacing:0.08em;
     }
     div[data-testid="stMetricValue"] {
-        color: #ffffff !important; 
-        font-size: 28px !important;
+        color:#ffffff !important; font-size:26px !important; font-weight:800 !important;
     }
-
     /* ── TABS ── */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: transparent !important;
+        background-color:#1a2332 !important; border-radius:10px !important;
+        padding:4px !important; border:1px solid #2d4a6b !important;
     }
     .stTabs [data-baseweb="tab"] {
-        background-color: #1c2128 !important;
-        border: 1px solid #30363d !important;
-        color: #8b949e !important;
+        border-radius:7px !important; font-weight:600 !important;
+        font-size:13px !important; color:#7fb3d3 !important; padding:8px 16px !important;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #1f6feb !important;
-        color: white !important;
+        background-color:#2563eb !important; color:#ffffff !important;
     }
-
-    /* ── TABLES ── */
-    .stDataFrame, [data-testid="stTable"] {
-        background-color: #0d1117 !important;
-        border: 1px solid #30363d !important;
+    /* ── SIDEBAR ── */
+    section[data-testid="stSidebar"] {
+        background-color:#0d1421 !important; border-right:1px solid #1e3a5f !important;
     }
+    /* ── BUTTONS ── */
+    .stButton > button {
+        background-color:#2563eb !important; color:#ffffff !important;
+        font-weight:700 !important; border:none !important;
+        border-radius:8px !important; padding:10px 24px !important; font-size:14px !important;
+    }
+    .stButton > button:hover { background-color:#1d4ed8 !important; }
+    /* ── MULTISELECT TAGS ── */
+    span[data-baseweb="tag"] { background-color:#2563eb !important; border-radius:20px !important; }
+    span[data-baseweb="tag"] span { color:#ffffff !important; font-weight:600 !important; }
+    /* ── DATAFRAME ── */
+    .stDataFrame thead th {
+        background-color:#1a2332 !important; color:#7fb3d3 !important;
+        font-weight:700 !important; font-size:12px !important;
+    }
+    /* ── EXPANDER ── */
+    .streamlit-expanderHeader {
+        background-color:#1a2332 !important; color:#e2e8f0 !important;
+        font-weight:600 !important; border-radius:8px !important; border:1px solid #2d4a6b !important;
+    }
+    .streamlit-expanderContent {
+        background-color:#131c2b !important; border:1px solid #2d4a6b !important;
+    }
+    /* ── CUSTOM BOXES ── */
+    .warning-box {
+        background-color:#2d1a00; border-left:4px solid #f59e0b;
+        padding:10px 14px; border-radius:6px; color:#fbbf24; font-size:13px;
+    }
+    .nse-link-box {
+        background-color:#0d1e35; border-left:4px solid #3b82f6;
+        padding:10px 14px; border-radius:6px; color:#93c5fd; font-size:13px;
+    }
+    .nse-link-box a { color:#60a5fa !important; font-weight:600; }
+    /* ── SCANNER BADGES ── */
+    .scanner-badge {
+        display:inline-block; padding:3px 10px; border-radius:20px;
+        font-size:11px; font-weight:700; margin-right:5px;
+    }
+    /* ── ANIMATIONS ── */
+    @keyframes pulse-green {
+        0%,100% { box-shadow:0 0 0 0 rgba(34,197,94,0.5); }
+        50%      { box-shadow:0 0 0 10px rgba(34,197,94,0); }
+    }
+    .signal-pulse-green { animation:pulse-green 2s infinite; border-radius:10px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -624,46 +644,32 @@ with tab0:
             labels    = ["{} {}".format(o["asset"], o["strategy"][:3]) for o in opportunities]
             net_vals  = [o["net_pnl"] for o in opportunities]
             ann_vals  = [o["ann_return"] for o in opportunities]
-            
-            # High-contrast colors
-            colors = ["#238636" if v > 0 else "#da3633" for v in net_vals]
+            colors    = ["#16a34a" if o["profitable"] else "#adb5bd" for o in opportunities]
 
             fig_scan = go.Figure()
-            
-            # Bar Chart for P&L
             fig_scan.add_trace(go.Bar(
                 name="Net P&L (₹)", x=labels, y=net_vals,
                 marker_color=colors,
                 text=["₹{:,.0f}".format(v) for v in net_vals],
-                textposition="outside",
-                textfont=dict(color="#ffffff"),
-                yaxis="y1"
-            ))
-            
-            # Line Chart for Annualised Return
+                textposition="outside", yaxis="y1"))
             fig_scan.add_trace(go.Scatter(
                 name="Ann. Return (%)", x=labels, y=ann_vals,
                 mode="lines+markers+text",
-                line=dict(color="#f59e0b", width=3),
+                line=dict(color="#ff7f0e", width=2.5),
+                marker=dict(size=8, color="#f59e0b"),
                 text=["{:.1f}%".format(v) for v in ann_vals],
                 textposition="top center",
-                textfont=dict(color="#f59e0b", fontWeight='bold'),
-                yaxis="y2"
-            ))
-
+                yaxis="y2"))
             fig_scan.update_layout(
-                template="plotly_dark", # Forces dark theme
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                title=dict(text="<b>Arbitrage Yield Analysis</b>", font=dict(size=20, color="#ffffff")),
-                xaxis=dict(gridcolor="#30363d", tickfont=dict(color="#8b949e")),
-                yaxis=dict(title="Net P&L (₹)", gridcolor="#30363d", tickfont=dict(color="#8b949e")),
-                yaxis2=dict(title="Ann. Return (%)", overlaying="y", side="right", tickfont=dict(color="#f59e0b")),
-                legend=dict(font=dict(color="#ffffff")),
-                margin=dict(t=80, b=40, l=10, r=10),
-                barmode="group"
-            )
-            
+                title="Net P&L & Annualised Return — All Scanned Opportunities",
+                xaxis=dict(title="Strategy · Asset"),
+                yaxis=dict(title=dict(text="Net P&L (₹)", font=dict(color="#16a34a")),
+                           tickformat=",.0f"),
+                yaxis2=dict(title=dict(text="Ann. Return (%)", font=dict(color="#f59e0b")),
+                            overlaying="y", side="right", tickformat=".1f"),
+                height=380, margin=dict(t=45, b=40, l=10, r=10),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                plot_bgcolor="#131c2b", paper_bgcolor="#0d1421", barmode="group")
             st.plotly_chart(fig_scan, use_container_width=True)
 
         # ── Exportable summary table ───────────────────────────────────────
