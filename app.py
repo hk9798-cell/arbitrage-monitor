@@ -16,27 +16,62 @@ st.markdown("""
         background-color: #0d1421 !important;
     }
 
-    /* ── 2. THE ULTIMATE DROPDOWN FIX (BaseWeb Portals) ── */
-    /* This targets the actual menu that pops up when you click a dropdown */
-    div[data-baseweb="popover"], div[role="listbox"] {
+    /* ── 2. COMPREHENSIVE DROPDOWN FIX ── */
+    /* Popover container that appears when dropdown opens */
+    div[data-baseweb="popover"],
+    div[data-baseweb="popover"] > div,
+    [data-baseweb="menu"],
+    div[role="listbox"] {
         background-color: #1a2332 !important;
         border: 1px solid #2d4a6b !important;
     }
 
-    /* This forces the text of the ASSET NAMES (NIFTY, RELIANCE, etc.) to be white */
-    div[role="option"], div[role="option"] span, li[role="option"] {
+    /* All option items inside dropdown */
+    div[role="option"],
+    li[role="option"],
+    [data-baseweb="menu"] li,
+    [data-baseweb="menu"] ul li,
+    ul[data-baseweb="menu-list"] li {
+        background-color: #1a2332 !important;
+        color: #ffffff !important;
+    }
+
+    /* All text/spans inside option items */
+    div[role="option"] *,
+    li[role="option"] *,
+    [data-baseweb="menu"] li *,
+    ul[data-baseweb="menu-list"] li * {
         color: #ffffff !important;
         background-color: transparent !important;
     }
 
-    /* Highlight color when you hover over an option */
-    div[role="option"]:hover, li[role="option"]:hover {
+    /* Hover state for options */
+    div[role="option"]:hover,
+    li[role="option"]:hover,
+    [data-baseweb="menu"] li:hover,
+    ul[data-baseweb="menu-list"] li:hover {
         background-color: #2563eb !important;
+        color: #ffffff !important;
     }
 
-    /* This targets the text color of the selection inside the box before clicking */
-    div[data-baseweb="select"] div {
+    /* Selected/active option highlight */
+    div[aria-selected="true"],
+    li[aria-selected="true"] {
+        background-color: #1e3a6e !important;
         color: #ffffff !important;
+    }
+
+    /* Text inside the select box (chosen value displayed) */
+    div[data-baseweb="select"] *,
+    div[data-baseweb="select"] div,
+    div[data-baseweb="select"] span {
+        color: #ffffff !important;
+    }
+
+    /* Dropdown input wrapper */
+    div[data-baseweb="select"] > div {
+        background-color: #1a2332 !important;
+        border-color: #2d4a6b !important;
     }
 
     /* ── 3. UNIVERSAL TEXT & LABELS ── */
@@ -1545,7 +1580,6 @@ the dashboard calculates the arbitrage profit and provides step-by-step executio
 - ✅ Covered Interest Rate Parity (CIRP) detection
 - ✅ Cross-Market Statistical Spread Arbitrage
 - ✅ Live market data via yfinance (spot prices)
-- ✅ Option Greeks (Delta, Gamma, Theta, Vega, Rho) via Black-Scholes-Merton
 - ✅ Historical gap analysis and sensitivity analysis
 - ✅ Automated profit calculation including all transaction costs
 - ✅ Step-by-step execution strategy for each opportunity
