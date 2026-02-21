@@ -11,112 +11,310 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 
 st.markdown("""
     <style>
-    /* ── 1. MAIN APP & SIDEBAR BACKGROUND ── */
-    [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stSidebar"] {
-        background-color: #0d1421 !important;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+    /* ══════════════════════════════════════════
+       DESIGN SYSTEM — CLEAN DARK PROFESSIONAL
+       Background:  #0a0f1e  (deep navy)
+       Surface:     #111827  (card bg)
+       Border:      #1f2d45  (subtle borders)
+       Accent:      #3b82f6  (blue)
+       Text-1:      #f9fafb  (primary text)
+       Text-2:      #9ca3af  (secondary / labels)
+       Green:       #10b981
+       Red:         #ef4444
+       Amber:       #f59e0b
+    ══════════════════════════════════════════ */
+
+    /* ── 1. GLOBAL BACKGROUND & FONT ── */
+    html, body, [data-testid="stAppViewContainer"],
+    [data-testid="stHeader"], [data-testid="stMain"] {
+        background-color: #0a0f1e !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+    [data-testid="stSidebar"] {
+        background-color: #0d1424 !important;
+        border-right: 1px solid #1f2d45 !important;
+    }
+    /* Remove default Streamlit top padding */
+    .block-container {
+        padding-top: 1.2rem !important;
+        padding-bottom: 2rem !important;
     }
 
-    /* ── 2. COMPREHENSIVE DROPDOWN FIX ── */
-    /* Popover container that appears when dropdown opens */
+    /* ── 2. UNIVERSAL TEXT ── */
+    h1, h2, h3, h4, h5, h6 {
+        color: #f9fafb !important;
+        font-family: 'Inter', sans-serif !important;
+        letter-spacing: -0.02em !important;
+    }
+    p, span, label, li, div, .stMarkdown {
+        color: #e5e7eb !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+    /* Secondary labels smaller text */
+    .stCaption, [data-testid="stCaptionContainer"] p {
+        color: #6b7280 !important;
+    }
+
+    /* ── 3. SIDEBAR ELEMENTS ── */
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3,
+    [data-testid="stSidebar"] h4,
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] span,
+    [data-testid="stSidebar"] label {
+        color: #e5e7eb !important;
+    }
+    /* Sidebar divider */
+    [data-testid="stSidebar"] hr {
+        border-color: #1f2d45 !important;
+    }
+
+    /* ── 4. INPUT WIDGETS — SLIDERS, NUMBER INPUTS ── */
+    div[data-baseweb="input"] input,
+    div[data-baseweb="base-input"] input {
+        background-color: #111827 !important;
+        color: #f9fafb !important;
+        border: 1px solid #1f2d45 !important;
+        border-radius: 8px !important;
+    }
+    /* Slider track */
+    div[data-testid="stSlider"] div[role="slider"] {
+        background-color: #3b82f6 !important;
+    }
+
+    /* ── 5. COMPREHENSIVE DROPDOWN FIX ── */
+    /* The select box itself */
+    div[data-baseweb="select"] > div {
+        background-color: #111827 !important;
+        border: 1px solid #1f2d45 !important;
+        border-radius: 8px !important;
+    }
+    /* Selected value text */
+    div[data-baseweb="select"] *,
+    div[data-baseweb="select"] div,
+    div[data-baseweb="select"] span,
+    div[data-baseweb="select"] input {
+        color: #f9fafb !important;
+        background-color: transparent !important;
+    }
+    /* Dropdown portal / popover container */
     div[data-baseweb="popover"],
     div[data-baseweb="popover"] > div,
     [data-baseweb="menu"],
-    div[role="listbox"] {
-        background-color: #1a2332 !important;
-        border: 1px solid #2d4a6b !important;
+    div[role="listbox"],
+    ul[data-baseweb="menu-list"] {
+        background-color: #111827 !important;
+        border: 1px solid #1f2d45 !important;
+        border-radius: 10px !important;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
     }
-
-    /* All option items inside dropdown */
+    /* Each option row */
     div[role="option"],
     li[role="option"],
     [data-baseweb="menu"] li,
     [data-baseweb="menu"] ul li,
     ul[data-baseweb="menu-list"] li {
-        background-color: #1a2332 !important;
-        color: #ffffff !important;
+        background-color: #111827 !important;
+        color: #f9fafb !important;
+        padding: 8px 14px !important;
     }
-
-    /* All text/spans inside option items */
+    /* All text inside options */
     div[role="option"] *,
     li[role="option"] *,
     [data-baseweb="menu"] li *,
     ul[data-baseweb="menu-list"] li * {
-        color: #ffffff !important;
+        color: #f9fafb !important;
         background-color: transparent !important;
     }
-
-    /* Hover state for options */
+    /* Hover on option */
     div[role="option"]:hover,
     li[role="option"]:hover,
     [data-baseweb="menu"] li:hover,
     ul[data-baseweb="menu-list"] li:hover {
-        background-color: #2563eb !important;
+        background-color: #1e3a5f !important;
         color: #ffffff !important;
     }
-
-    /* Selected/active option highlight */
+    div[role="option"]:hover *,
+    li[role="option"]:hover * {
+        color: #ffffff !important;
+    }
+    /* Active/selected option */
     div[aria-selected="true"],
     li[aria-selected="true"] {
-        background-color: #1e3a6e !important;
+        background-color: #1d4ed8 !important;
         color: #ffffff !important;
     }
-
-    /* Text inside the select box (chosen value displayed) */
-    div[data-baseweb="select"] *,
-    div[data-baseweb="select"] div,
-    div[data-baseweb="select"] span {
-        color: #ffffff !important;
-    }
-
-    /* Dropdown input wrapper */
-    div[data-baseweb="select"] > div {
-        background-color: #1a2332 !important;
-        border-color: #2d4a6b !important;
-    }
-
-    /* ── 3. UNIVERSAL TEXT & LABELS ── */
-    h1, h2, h3, h4, h5, h6, p, span, label, li, .stMarkdown {
-        color: #f1f5f9 !important;
-    }
-
-    /* ── 4. METRIC CARDS ── */
-    div[data-testid="stMetric"] {
-        background: #1a2332 !important; 
-        border: 1px solid #2d4a6b !important;
-        border-radius: 10px !important;
-        padding: 14px 18px !important;
-    }
-    div[data-testid="stMetricLabel"] p {
-        color: #7fb3d3 !important;
-        font-weight: 700 !important;
-        text-transform: uppercase;
-    }
-    div[data-testid="stMetricValue"] {
-        color: #ffffff !important; 
-        font-size: 26px !important;
-    }
-
-    /* ── 5. TABS ── */
-    .stTabs [data-baseweb="tab-list"] {
-        background-color: #1a2332 !important;
-        border: 1px solid #2d4a6b !important;
-        border-radius: 10px !important;
-    }
-    .stTabs [data-baseweb="tab"] {
-        color: #7fb3d3 !important;
-        font-weight: 600 !important;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #2563eb !important;
+    div[aria-selected="true"] *,
+    li[aria-selected="true"] * {
         color: #ffffff !important;
     }
 
     /* ── 6. MULTISELECT TAGS ── */
     span[data-baseweb="tag"] {
-        background-color: #2563eb !important;
+        background-color: #1d4ed8 !important;
+        border-radius: 6px !important;
+        padding: 2px 8px !important;
     }
     span[data-baseweb="tag"] span {
         color: #ffffff !important;
+    }
+
+    /* ── 7. METRIC CARDS ── */
+    div[data-testid="stMetric"] {
+        background: #111827 !important;
+        border: 1px solid #1f2d45 !important;
+        border-radius: 12px !important;
+        padding: 16px 20px !important;
+        transition: border-color 0.2s;
+    }
+    div[data-testid="stMetric"]:hover {
+        border-color: #3b82f6 !important;
+    }
+    div[data-testid="stMetricLabel"] p {
+        color: #9ca3af !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.08em !important;
+    }
+    div[data-testid="stMetricValue"] {
+        color: #f9fafb !important;
+        font-size: 24px !important;
+        font-weight: 700 !important;
+    }
+    /* Delta positive */
+    div[data-testid="stMetricDelta"] [data-testid="stMetricDeltaIcon-Up"] { color: #10b981 !important; }
+    div[data-testid="stMetricDelta"] > div { font-size: 12px !important; }
+
+    /* ── 8. TABS ── */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #111827 !important;
+        border: 1px solid #1f2d45 !important;
+        border-radius: 10px !important;
+        padding: 4px !important;
+        gap: 2px !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        color: #9ca3af !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        border-radius: 8px !important;
+        padding: 8px 16px !important;
+        border: none !important;
+        transition: all 0.2s;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        color: #f9fafb !important;
+        background-color: #1f2d45 !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #1d4ed8 !important;
+        color: #ffffff !important;
+        box-shadow: 0 2px 8px rgba(29,78,216,0.4) !important;
+    }
+    /* Tab panel */
+    .stTabs [data-baseweb="tab-panel"] {
+        padding-top: 20px !important;
+    }
+
+    /* ── 9. DATAFRAMES & TABLES ── */
+    div[data-testid="stDataFrame"] {
+        border: 1px solid #1f2d45 !important;
+        border-radius: 10px !important;
+        overflow: hidden !important;
+    }
+
+    /* ── 10. BUTTONS ── */
+    div[data-testid="stButton"] button[kind="primary"] {
+        background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+        border: none !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        padding: 8px 20px !important;
+        box-shadow: 0 2px 8px rgba(37,99,235,0.35) !important;
+        transition: all 0.2s;
+    }
+    div[data-testid="stButton"] button[kind="primary"]:hover {
+        box-shadow: 0 4px 16px rgba(37,99,235,0.5) !important;
+        transform: translateY(-1px);
+    }
+    div[data-testid="stButton"] button[kind="secondary"] {
+        background: #111827 !important;
+        border: 1px solid #1f2d45 !important;
+        color: #e5e7eb !important;
+        border-radius: 8px !important;
+        font-weight: 500 !important;
+    }
+
+    /* ── 11. ALERTS / BANNERS ── */
+    div[data-testid="stAlert"] {
+        border-radius: 10px !important;
+        border-width: 1px !important;
+    }
+    /* Info */
+    div[data-testid="stAlert"][data-baseweb="notification"][kind="info"] {
+        background-color: #0c1a2e !important;
+        border-color: #1e40af !important;
+    }
+    /* Success */
+    div[data-testid="stAlert"][kind="success"] {
+        background-color: #052e16 !important;
+        border-color: #166534 !important;
+    }
+    /* Warning */
+    div[data-testid="stAlert"][kind="warning"] {
+        background-color: #1c1003 !important;
+        border-color: #92400e !important;
+    }
+
+    /* ── 12. EXPANDER ── */
+    details summary {
+        color: #9ca3af !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+    }
+    details[open] summary {
+        color: #f9fafb !important;
+    }
+
+    /* ── 13. DIVIDERS ── */
+    hr {
+        border-color: #1f2d45 !important;
+        margin: 20px 0 !important;
+    }
+
+    /* ── 14. CHECKBOX ── */
+    label[data-baseweb="checkbox"] span {
+        color: #e5e7eb !important;
+    }
+
+    /* ── 15. SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0a0f1e; }
+    ::-webkit-scrollbar-thumb { background: #1f2d45; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
+
+    /* ── 16. CODE BLOCKS ── */
+    code, pre {
+        background-color: #111827 !important;
+        color: #a5f3fc !important;
+        border: 1px solid #1f2d45 !important;
+        border-radius: 6px !important;
+        font-size: 13px !important;
+    }
+
+    /* ── 17. SIDEBAR WIDGET LABELS ── */
+    [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
+    [data-testid="stSidebar"] [data-testid="stWidgetLabel"] label {
+        color: #9ca3af !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.06em !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -151,15 +349,39 @@ def _init_settings():
 _init_settings()
 
 st.markdown("""
-<div style="padding:8px 0 4px 0; display:flex; align-items:center; gap:14px;">
-  <span style="font-size:2rem;">🏛️</span>
+<div style="
+    padding: 20px 0 16px 0;
+    border-bottom: 1px solid #1f2d45;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+">
+  <div style="
+      background: linear-gradient(135deg, #1d4ed8, #2563eb);
+      border-radius: 12px;
+      width: 48px; height: 48px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem;
+      flex-shrink: 0;
+      box-shadow: 0 4px 16px rgba(37,99,235,0.35);
+  ">🏛️</div>
   <div>
-    <h1 style="margin:0; font-size:1.75rem; font-weight:900; color:#f1f5f9; line-height:1.2;">
-      Cross-Asset Arbitrage Opportunity Monitor</h1>
-    <p style="margin:2px 0 0; font-size:12px; color:#6b7280;">
-      IIT Roorkee &nbsp;·&nbsp; Dept. of Management Studies &nbsp;·&nbsp;
-      Financial Engineering &nbsp;·&nbsp;
-      <span style="color:#94a3b8; font-weight:600;">Group 4</span></p>
+    <h1 style="
+        margin: 0;
+        font-size: 1.55rem;
+        font-weight: 800;
+        color: #f9fafb;
+        line-height: 1.25;
+        letter-spacing: -0.025em;
+    ">Cross-Asset Arbitrage Opportunity Monitor</h1>
+    <p style="
+        margin: 4px 0 0;
+        font-size: 12px;
+        color: #6b7280;
+        letter-spacing: 0.02em;
+    ">IIT Roorkee &nbsp;·&nbsp; Dept. of Management Studies &nbsp;·&nbsp; Financial Engineering &nbsp;·&nbsp;
+    <span style="color:#3b82f6; font-weight: 600;">Group 4</span></p>
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -206,24 +428,35 @@ with st.spinner(""):
     ticker_data = get_ticker_bar_data()
 
 now_str = datetime.datetime.now().strftime("%H:%M:%S")
-ticker_html = '''<div style="background:#1a2332; border:1px solid #2d4a6b; border-radius:10px; padding:10px 20px; margin-bottom:16px; display:flex; flex-wrap:wrap; align-items:center; gap:0; box-shadow:0 2px 10px rgba(0,0,0,0.5);"><span style="font-size:10px; color:#3b82f6; font-weight:800; margin-right:20px; letter-spacing:0.15em; flex-shrink:0;">● LIVE MARKET</span>'''
+ticker_html = (
+    '<div style="background:#111827; border:1px solid #1f2d45; border-radius:10px;'
+    ' padding:10px 18px; margin-bottom:18px; display:flex; flex-wrap:wrap;'
+    ' align-items:center; gap:0; box-shadow:0 2px 12px rgba(0,0,0,0.4);">'
+    '<span style="font-size:10px; color:#3b82f6; font-weight:700; margin-right:18px;'
+    ' letter-spacing:0.15em; flex-shrink:0; display:inline-flex; align-items:center; gap:5px;">'
+    '<span style="width:7px;height:7px;background:#10b981;border-radius:50%;'
+    ' display:inline-block;box-shadow:0 0 6px #10b981;"></span>LIVE</span>'
+)
 
 for asset_name, d in ticker_data.items():
-    color  = "#22c55e" if d["chg"] >= 0 else "#ef4444"
+    color  = "#10b981" if d["chg"] >= 0 else "#ef4444"
     arrow  = "▲" if d["chg"] >= 0 else "▼"
     prefix = "₹" if asset_name != "USD/INR" else ""
     ticker_html += (
-        '<span style="font-size:13px; font-weight:700; color:#f1f5f9;'
-        ' margin-right:20px; display:inline-flex; align-items:center; gap:4px;">'
-        '<span style="color:#7fb3d3; font-size:11px; font-weight:800;">{n}&nbsp;</span>'
-        '{p}{v:,.2f}'
-        '<span style="color:{c};font-size:12px;font-weight:600;"> {a}{p2}{chg:.2f} ({pct:.2f}%)</span>'
+        '<span style="font-size:13px; font-weight:600; color:#f9fafb;'
+        ' margin-right:22px; display:inline-flex; align-items:center; gap:5px;">'
+        '<span style="color:#6b7280; font-size:11px; font-weight:700;">{n}</span>'
+        '<span style="color:#f9fafb;">{p}{v:,.2f}</span>'
+        '<span style="color:{c}; font-size:11px; font-weight:600;">{a} {pct:.2f}%</span>'
         '</span>'.format(
             n=asset_name, p=prefix, v=d["price"],
-            c=color, a=arrow, p2=prefix, chg=abs(d["chg"]), pct=abs(d["chg_pct"]))
+            c=color, a=arrow, pct=abs(d["chg_pct"]))
     )
 
-ticker_html += '<span style="margin-left:auto;font-size:10px;color:#374151;">Updated {t}</span></div>'.format(t=now_str)
+ticker_html += (
+    '<span style="margin-left:auto; font-size:10px; color:#374151;'
+    ' white-space:nowrap;">Updated {t}</span></div>'.format(t=now_str)
+)
 st.markdown(ticker_html, unsafe_allow_html=True)
 
 
@@ -603,7 +836,7 @@ with tab0:
 
             pnl_color   = "#22c55e" if opp["profitable"] else "#94a3b8"
             border_col  = "#22c55e" if opp["profitable"] else "#374151"
-            bg_col      = "#0b1a10" if opp["profitable"] else "#131c2b"
+            bg_col      = "#051a0f" if opp["profitable"] else "#111827"
             sp          = "Rs." if opp["asset"] != "USD/INR" else ""
 
             card_html = (
@@ -655,7 +888,7 @@ with tab0:
                 '</div>'
                 '</div>'
 
-                '<div style="font-size:12px; color:#7fb3d3; padding:4px 0 0 0;">'
+                '<div style="font-size:12px; color:#9ca3af; padding:4px 0 0 0;">'
                 '<span style="font-size:10px; color:#4b5563; font-weight:700;'
                 ' text-transform:uppercase; letter-spacing:0.06em;">Execution: </span>'
                 '{action}'
@@ -704,7 +937,7 @@ with tab0:
                             overlaying="y", side="right", tickformat=".1f"),
                 height=380, margin=dict(t=45, b=40, l=10, r=10),
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                plot_bgcolor="#131c2b", paper_bgcolor="#0d1421", barmode="group")
+                plot_bgcolor="#111827", paper_bgcolor="#0a0f1e", barmode="group")
             st.plotly_chart(fig_scan, use_container_width=True)
 
         # ── Exportable summary table ───────────────────────────────────────
@@ -823,14 +1056,19 @@ with tab1:
     elif data_source == "yf_spot":
         st.warning("⚠️ {}".format(fetch_error))
         st.markdown(
-            '<div class="nse-link-box">📋 <strong>Get option prices from NSE:</strong> '
-            '<a href="{}" target="_blank">Open {} Option Chain on NSE ↗</a><br>'
-            'Enter ATM Call & Put LTP below.</div>'.format(NSE_CHAIN_URLS[asset], asset),
+            '<div style="background:#0c1a2e; border:1px solid #1e40af; border-radius:8px;'
+            ' padding:10px 14px; font-size:13px; color:#93c5fd; margin:6px 0;">📋 '
+            '<strong style="color:#bfdbfe;">Get option prices from NSE:</strong> '
+            '<a href="{}" target="_blank" style="color:#60a5fa;">Open {} Option Chain on NSE ↗</a><br>'
+            '<span style="color:#6b7280;">Enter ATM Call &amp; Put LTP below.</span></div>'.format(
+                NSE_CHAIN_URLS[asset], asset),
             unsafe_allow_html=True)
     else:
         st.error("⚠️ {}".format(fetch_error))
         st.markdown(
-            '<div class="nse-link-box">📋 <a href="{}" target="_blank">Open {} Option Chain on NSE ↗</a></div>'.format(
+            '<div style="background:#1c0a0a; border:1px solid #7f1d1d; border-radius:8px;'
+            ' padding:10px 14px; font-size:13px; color:#fca5a5; margin:6px 0;">📋 '
+            '<a href="{}" target="_blank" style="color:#f87171;">Open {} Option Chain on NSE ↗</a></div>'.format(
                 NSE_CHAIN_URLS[asset], asset), unsafe_allow_html=True)
 
     lot = LOT_SIZES[asset]
@@ -907,16 +1145,15 @@ with tab1:
     m6.metric("Ann. Return",       "{:.2f}%".format(ann_return_pcp),
               delta="{} days".format(days_to_expiry), delta_color="off")
 
-    pulse_class = "signal-pulse-green" if signal_type == "conversion" else (
-                   "signal-pulse-red"   if signal_type == "reversal" else "")
+    pulse_class = ""
     st.markdown(
-        '<div class="{pulse}" style="background:{c}; padding:16px; border-radius:12px; text-align:center; '
-        'color:white; margin:12px 0; border: 2px solid rgba(255,255,255,0.2);">'
-        '<h2 style="margin:0; font-size:22px; font-weight:900;">{s}</h2>'
-        '<p style="margin:4px 0 0; font-size:14px; opacity:.9;">'
-        'Strategy: <b>{d}</b> &nbsp;|&nbsp; Expiry: <b>{e}</b> &nbsp;|&nbsp; '
-        '<b>{dte} days</b> &nbsp;|&nbsp; Ann. Return: <b>{ann:.2f}%</b></p></div>'.format(
-            pulse=pulse_class, c=signal_color, s=signal_line, d=strategy_desc,
+        '<div style="background:{c}; padding:16px 20px; border-radius:12px; text-align:center; '
+        'color:white; margin:12px 0; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">'
+        '<h2 style="margin:0; font-size:20px; font-weight:800; letter-spacing:-0.02em;">{s}</h2>'
+        '<p style="margin:6px 0 0; font-size:13px; opacity:.85;">'
+        'Strategy: <b>{d}</b> &nbsp;·&nbsp; Expiry: <b>{e}</b> &nbsp;·&nbsp; '
+        '<b>{dte} days</b> &nbsp;·&nbsp; Ann. Return: <b>{ann:.2f}%</b></p></div>'.format(
+            c=signal_color, s=signal_line, d=strategy_desc,
             e=expiry_date.strftime("%d %b %Y"), dte=days_to_expiry, ann=ann_return_pcp),
         unsafe_allow_html=True)
 
@@ -925,18 +1162,16 @@ with tab1:
     alert_threshold = st.session_state.get("alert_threshold", 500)
     if signal_type != "none" and pnl_profitable and net_pnl >= alert_threshold:
         st.markdown(
-            '''<div style="background:linear-gradient(135deg,#052e16,#14532d);
-                border:3px solid #22c55e; border-radius:12px; padding:16px 24px;
+            '''<div style="background:linear-gradient(135deg,#052e16,#064e3b);
+                border:2px solid #10b981; border-radius:12px; padding:18px 24px;
                 text-align:center; margin:8px 0;
-                box-shadow: 0 0 30px rgba(34,197,94,0.4);"
-                class="signal-pulse-green">
-              <div style="font-size:28px;">🚨</div>
-              <div style="font-size:20px;font-weight:900;color:#22c55e;">
+                box-shadow: 0 0 24px rgba(16,185,129,0.25);">
+              <div style="font-size:26px; margin-bottom:4px;">🚨</div>
+              <div style="font-size:18px;font-weight:800;color:#10b981; letter-spacing:-0.02em;">
                 TRADE SIGNAL — EXECUTE NOW</div>
-              <div style="font-size:14px;color:#86efac;margin-top:4px;">
-                Net Profit ₹{pnl:,.2f} exceeds your alert threshold of ₹{thr:,.0f}
-                &nbsp;|&nbsp; Ann. Return: {ann:.2f}%
-                &nbsp;|&nbsp; Expiry: {exp}
+              <div style="font-size:13px;color:#6ee7b7;margin-top:6px;line-height:1.6;">
+                Net Profit ₹{pnl:,.2f} &nbsp;·&nbsp; Ann. Return: {ann:.2f}%
+                &nbsp;·&nbsp; Expiry: {exp}
               </div>
             </div>'''.format(
                 pnl=net_pnl, thr=alert_threshold,
@@ -946,7 +1181,7 @@ with tab1:
         st.info("💡 Profitable opportunity found. Raise alert threshold in ⚙️ Settings to trigger the TRADE NOW banner.")
 
     if signal_type != "none" and not pnl_profitable:
-        st.markdown('<div class="warning-box">⚠️ Gap detected but NOT profitable after costs. Do not trade.</div>',
+        st.markdown('<div style="background:#1c0a0a; border:1px solid #7f1d1d; border-left:3px solid #ef4444; border-radius:8px; padding:12px 16px; color:#fca5a5; font-size:13px; font-weight:600;">⚠️ Gap detected but NOT profitable after costs. Do not trade.</div>',
                     unsafe_allow_html=True)
 
     # ── PROOF + CHART ─────────────────────────────────────────────────────────
@@ -1005,15 +1240,15 @@ with tab1:
                       annotation_text="Spot ₹{:,.0f}".format(s0), annotation_position="top right")
         fig.update_layout(
             title="Payoff at Expiry ({}) — {} days".format(expiry_date.strftime("%d %b %Y"), days_to_expiry),
-            xaxis=dict(title="Spot Price at Expiry (₹)", tickformat=",.0f", showgrid=True, gridcolor="#1e3050"),
+            xaxis=dict(title="Spot Price at Expiry (₹)", tickformat=",.0f", showgrid=True, gridcolor="#1f2d45"),
             yaxis=dict(title=dict(text="Leg P&L (₹)", font=dict(color="#555")),
                        tickformat=",.0f", showgrid=False),
             yaxis2=dict(title=dict(text="Net P&L (₹)", font=dict(color=signal_color)),
                         tickformat=",.0f", overlaying="y", side="right",
-                        range=[-net_pad, net_pad], showgrid=True, gridcolor="#1e3050"),
+                        range=[-net_pad, net_pad], showgrid=True, gridcolor="#1f2d45"),
             height=370, margin=dict(t=45, b=40, l=10, r=10),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            hovermode="x unified", plot_bgcolor="#131c2b", paper_bgcolor="#0d1421")
+            hovermode="x unified", plot_bgcolor="#111827", paper_bgcolor="#0a0f1e")
         st.plotly_chart(fig, use_container_width=True)
         st.caption("📌 Dotted = individual legs (left axis). Solid = Net P&L after costs (right axis). The flat line proves the arbitrage is locked.")
 
@@ -1186,7 +1421,7 @@ with tab2:
         xaxis=dict(title="Market Forward Rate (USD/INR)", tickformat=".4f"),
         yaxis=dict(title="Net Profit (₹)", tickformat=",.0f"),
         height=320, margin=dict(t=40,b=30,l=10,r=10),
-        plot_bgcolor="#131c2b", paper_bgcolor="#0d1421", showlegend=False)
+        plot_bgcolor="#111827", paper_bgcolor="#0a0f1e", showlegend=False)
     st.plotly_chart(fig_irp, use_container_width=True)
     st.caption("Green = Theoretical forward (no-arbitrage). Red = current market forward. Width of gap = arbitrage opportunity size.")
 
@@ -1294,15 +1529,16 @@ with tab3:
               delta_color="normal" if fb_profitable else "inverse")
 
     st.markdown(
-        '<div style="background:{c}; padding:14px; border-radius:10px; text-align:center; color:white; margin:12px 0;">'
-        '<h2 style="margin:0; font-size:20px;">{s}</h2>'
-        '<p style="margin:4px 0 0; font-size:14px; opacity:.9;">Strategy: {st} | Expiry: {e} ({d} days)</p>'
+        '<div style="background:{c}; padding:16px 20px; border-radius:12px; text-align:center;'
+        ' color:white; margin:12px 0; box-shadow:0 4px 16px rgba(0,0,0,0.3);">'
+        '<h2 style="margin:0; font-size:20px; font-weight:800; letter-spacing:-0.02em;">{s}</h2>'
+        '<p style="margin:6px 0 0; font-size:13px; opacity:.85;">Strategy: {st} &nbsp;·&nbsp; Expiry: {e} ({d} days)</p>'
         '</div>'.format(c=fb_color, s=fb_signal, st=fb_strategy,
                         e=fb_expiry.strftime("%d %b %Y"), d=fb_days),
         unsafe_allow_html=True)
 
     if fb_basis != 0 and not fb_profitable:
-        st.markdown('<div class="warning-box">⚠️ Basis gap detected but costs exceed profit. Do not trade.</div>',
+        st.markdown('<div style="background:#1c0a0a; border:1px solid #7f1d1d; border-left:3px solid #ef4444; border-radius:8px; padding:12px 16px; color:#fca5a5; font-size:13px; font-weight:600; margin:6px 0;">⚠️ Basis gap detected but costs exceed profit. Do not trade.</div>',
                     unsafe_allow_html=True)
 
     st.markdown("#### 📐 Detailed Calculation")
@@ -1357,7 +1593,7 @@ with tab3:
                     overlaying="y", side="right", tickformat=",.2f"),
         height=320, margin=dict(t=40,b=30,l=10,r=10),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        plot_bgcolor="#131c2b", paper_bgcolor="#0d1421")
+        plot_bgcolor="#111827", paper_bgcolor="#0a0f1e")
     st.plotly_chart(fig_fb, use_container_width=True)
     st.caption("As time passes, F* rises (cost of carry accumulates) and converges to F_mkt at expiry. "
                "The basis (orange dotted) decays to zero — this convergence locks in the arbitrage profit.")
