@@ -11,45 +11,47 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 
 st.markdown("""
     <style>
-    /* 1. FORCE THE WHOLE APP BACKGROUND */
+    /* 1. APP & SIDEBAR BACKGROUND */
     [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stSidebar"] {
         background-color: #0d1117 !important;
     }
 
-    /* 2. THE DROPDOWN & LISTBOX FIX (The missing Asset names) */
-    /* This targets the actual dropdown box */
-    div[data-baseweb="select"] > div {
-        background-color: #1c2128 !important;
-        border: 1px solid #30363d !important;
-    }
-    
-    /* This forces the text INSIDE the box and the LIST items to be white */
-    div[data-baseweb="select"] *, div[role="listbox"] *, div[role="option"] * {
-        color: #ffffff !important;
-    }
-
-    /* Force the background of the pop-up list to be dark so white text is visible */
-    div[role="listbox"], div[role="option"] {
-        background-color: #1c2128 !important;
-    }
-
-    /* Highlight color when you hover over an asset name */
-    div[role="option"]:hover {
-        background-color: #1f6feb !important;
-    }
-
-    /* 3. UNIVERSAL TEXT VISIBILITY (Headers, Labels, Sidebar) */
+    /* 2. UNIVERSAL TEXT (Labels, Headings, Sidebar) */
     h1, h2, h3, h4, h5, h6, p, span, label, li, .stMarkdown {
         color: #ffffff !important;
     }
 
-    /* Specifically target Sidebar labels like "Brokerage" */
-    [data-testid="stWidgetLabel"] p {
+    /* 3. THE DROPDOWN "INVISIBLE ASSET" FIX */
+    /* This forces the text color INSIDE the box before you click it */
+    div[data-baseweb="select"] div {
         color: #ffffff !important;
-        font-weight: 600 !important;
     }
 
-    /* 4. METRIC CARDS */
+    /* This targets the POP-UP menu (the Listbox) when you click it */
+    div[role="listbox"] {
+        background-color: #1c2128 !important; /* Dark background for the menu */
+        border: 1px solid #30363d !important;
+    }
+
+    /* This forces the ASSET NAMES (Nifty, Reliance, etc.) to be White */
+    div[role="option"] {
+        color: #ffffff !important;
+        background-color: transparent !important;
+    }
+
+    /* Highlight color when your mouse hovers over an asset name */
+    div[role="option"]:hover {
+        background-color: #1f6feb !important;
+        color: #ffffff !important;
+    }
+
+    /* 4. INPUT BOXES (Brokerage, Lots, etc.) */
+    input {
+        color: #ffffff !important;
+        background-color: #1c2128 !important;
+    }
+
+    /* 5. METRIC CARDS */
     div[data-testid="stMetric"] {
         background: #161b22 !important; 
         border: 1px solid #30363d !important;
@@ -57,21 +59,20 @@ st.markdown("""
     }
     div[data-testid="stMetricLabel"] p {
         color: #8b949e !important;
-        font-size: 12px !important;
     }
     div[data-testid="stMetricValue"] {
-        color: #ffffff !important;
+        color: #ffffff !important; 
     }
 
-    /* 5. TABS */
+    /* 6. TABS */
     .stTabs [data-baseweb="tab-list"] { background-color: transparent !important; }
     .stTabs [data-baseweb="tab"] {
         background-color: #1c2128 !important;
-        border: 1px solid #30363d !important;
         color: #adbac7 !important;
+        border-radius: 4px !important;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #1f6feb !important;
+        background-color: #2563eb !important;
         color: white !important;
     }
     </style>
