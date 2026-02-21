@@ -634,32 +634,78 @@ with tab0:
             labels    = ["{} {}".format(o["asset"], o["strategy"][:3]) for o in opportunities]
             net_vals  = [o["net_pnl"] for o in opportunities]
             ann_vals  = [o["ann_return"] for o in opportunities]
-            colors    = ["#16a34a" if o["profitable"] else "#adb5bd" for o in opportunities]
+            
+            # Use specific "Fintech" colors for bars
+            colors    = ["#22c55e" if o["profitable"] else "#4b5563" for o in opportunities]
 
             fig_scan = go.Figure()
+            
+            # Primary Axis: Net P&L
             fig_scan.add_trace(go.Bar(
-                name="Net P&L (₹)", x=labels, y=net_vals,
+                name="Net P&L (₹)", 
+                x=labels, 
+                y=net_vals,
                 marker_color=colors,
+                marker_line=dict(width=1, color="#30363d"),
                 text=["₹{:,.0f}".format(v) for v in net_vals],
-                textposition="outside", yaxis="y1"))
+                textposition="outside",
+                textfont=dict(color="#f0f6fc", size=11), # Pure white text for numbers
+                yaxis="y1"
+            ))
+            
+            # Secondary Axis: Annualised Return
             fig_scan.add_trace(go.Scatter(
-                name="Ann. Return (%)", x=labels, y=ann_vals,
+                name="Ann. Return (%)", 
+                x=labels, 
+                y=ann_vals,
                 mode="lines+markers+text",
-                line=dict(color="#ff7f0e", width=2.5),
-                marker=dict(size=8, color="#f59e0b"),
+                line=dict(color="#f59e0b", width=3, dash='dot'),
+                marker=dict(size=10, color="#f59e0b", symbol='diamond'),
                 text=["{:.1f}%".format(v) for v in ann_vals],
                 textposition="top center",
-                yaxis="y2"))
+                textfont=dict(color="#f59e0b", size=12, fontWeight='bold'),
+                yaxis="y2"
+            ))
+
             fig_scan.update_layout(
-                title="Net P&L & Annualised Return — All Scanned Opportunities",
-                xaxis=dict(title="Strategy · Asset"),
-                yaxis=dict(title=dict(text="Net P&L (₹)", font=dict(color="#16a34a")),
-                           tickformat=",.0f"),
-                yaxis2=dict(title=dict(text="Ann. Return (%)", font=dict(color="#f59e0b")),
-                            overlaying="y", side="right", tickformat=".1f"),
-                height=380, margin=dict(t=45, b=40, l=10, r=10),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                plot_bgcolor="#131c2b", paper_bgcolor="#0d1421", barmode="group")
+                title=dict(
+                    text="<b>Arbitrage Analysis: Net P&L & Annualised Returns</b>",
+                    font=dict(size=20, color="#ffffff") # High visibility title
+                ),
+                xaxis=dict(
+                    title="Strategy & Asset",
+                    tickfont=dict(color="#8b949e"),
+                    gridcolor="#30363d"
+                ),
+                yaxis=dict(
+                    title=dict(text="Net P&L (₹)", font=dict(color="#22c55e", size=14)),
+                    tickfont=dict(color="#8b949e"),
+                    tickformat=",.0f",
+                    gridcolor="#30363d", # Darker grid lines
+                    zerolinecolor="#444c56"
+                ),
+                yaxis2=dict(
+                    title=dict(text="Ann. Return (%)", font=dict(color="#f59e0b", size=14)),
+                    overlaying="y",
+                    side="right",
+                    tickfont=dict(color="#8b949e"),
+                    tickformat=".1f",
+                    gridcolor="rgba(0,0,0,0)" # Hide secondary grid to avoid clutter
+                ),
+                height=450,
+                margin=dict(t=80, b=40, l=10, r=10),
+                legend=dict(
+                    orientation="h", 
+                    yanchor="bottom", y=1.1, 
+                    xanchor="right", x=1,
+                    font=dict(color="#f0f6fc")
+                ),
+                plot_bgcolor="rgba(0,0,0,0)", # Transparent background
+                paper_bgcolor="rgba(0,0,0,0)",
+                barmode="group",
+                template="plotly_dark" # Essential for dark mode compatibility
+            )
+            
             st.plotly_chart(fig_scan, use_container_width=True)
 
         # ── Exportable summary table ───────────────────────────────────────
