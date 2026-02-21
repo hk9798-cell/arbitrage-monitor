@@ -327,32 +327,7 @@ st.markdown("""
         font-family: 'DM Sans', sans-serif !important;
     }
 
-    /* ── 14. EXPANDER ── */
-    details {
-        background-color: #10131f !important;
-        border: 1px solid #1e2336 !important;
-        border-radius: 10px !important;
-        padding: 2px 8px !important;
-        margin-bottom: 6px !important;
-    }
-    details summary {
-        color: #6b7a99 !important;
-        font-weight: 600 !important;
-        font-size: 13px !important;
-        padding: 8px 4px !important;
-        cursor: pointer;
-        letter-spacing: 0.01em;
-        list-style: none !important;
-    }
-    details summary::-webkit-details-marker { display: none; }
-    details[open] summary {
-        color: #a8b3c8 !important;
-        border-bottom: 1px solid #1e2336;
-        padding-bottom: 10px;
-        margin-bottom: 8px;
-    }
-
-    /* ── 15. DIVIDERS ── */
+    /* ── 14. DIVIDERS ── */
     hr {
         border: none !important;
         border-top: 1px solid #1e2336 !important;
@@ -1064,7 +1039,8 @@ with tab0:
         st.info("No opportunities found matching your filters. Try lowering the minimum profit threshold or adding more assets.")
 
     if st.session_state.show_metadata:
-        with st.expander("Scanner Methodology", expanded=False):
+        show_meth = st.checkbox("Show Scanner Methodology", value=False, key="show_meth_cb")
+        if show_meth:
             st.markdown("""
             **How the scanner works:**
             - **Put-Call Parity**: Uses ATM strike for each asset, computes gap = Spot − Synthetic, deducts STT + brokerage
@@ -1406,7 +1382,8 @@ with tab2:
     If the **market forward rate ≠ theoretical forward**, a covered arbitrage opportunity exists.
     """)
 
-    with st.expander("How IRP Arbitrage Works", expanded=False):
+    show_irp_how = st.checkbox("Show How IRP Arbitrage Works", value=False, key="show_irp_cb")
+    if show_irp_how:
         st.markdown("""
         **If Market Forward > Theoretical Forward (Forward is too expensive):**
         1. Borrow USD at US risk-free rate for T years
@@ -1563,7 +1540,8 @@ with tab3:
     - **If F_mkt < F_fair** → **Reverse Cash & Carry**: Short spot, buy futures, accept delivery
     """)
 
-    with st.expander("How Futures Basis Arbitrage Works", expanded=False):
+    show_fb_how = st.checkbox("Show How Futures Basis Arbitrage Works", value=False, key="show_fb_cb")
+    if show_fb_how:
         st.markdown("""
         **Cash & Carry (Futures overpriced):**
         1. Borrow money at risk-free rate for T years
