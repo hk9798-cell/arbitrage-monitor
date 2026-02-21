@@ -964,7 +964,7 @@ with tab0:
         st.info("No opportunities found matching your filters. Try lowering the minimum profit threshold or adding more assets.")
 
     if st.session_state.show_metadata:
-        with st.expander("ℹ️ Scanner Methodology", expanded=False):
+        with st.expander("▸ Scanner Methodology", expanded=False):
             st.markdown("""
             **How the scanner works:**
             - **Put-Call Parity**: Uses ATM strike for each asset, computes gap = Spot − Synthetic, deducts STT + brokerage
@@ -1295,7 +1295,7 @@ with tab2:
     If the **market forward rate ≠ theoretical forward**, a covered arbitrage opportunity exists.
     """)
 
-    with st.expander("📖 How IRP Arbitrage Works", expanded=False):
+    with st.expander("▸ How IRP Arbitrage Works", expanded=False):
         st.markdown("""
         **If Market Forward > Theoretical Forward (Forward is too expensive):**
         1. Borrow USD at US risk-free rate for T years
@@ -1441,7 +1441,7 @@ with tab3:
     - **If F_mkt < F_fair** → **Reverse Cash & Carry**: Short spot, buy futures, accept delivery
     """)
 
-    with st.expander("📖 How Futures Basis Arbitrage Works", expanded=False):
+    with st.expander("▸ How Futures Basis Arbitrage Works", expanded=False):
         st.markdown("""
         **Cash & Carry (Futures overpriced):**
         1. Borrow money at risk-free rate for T years
