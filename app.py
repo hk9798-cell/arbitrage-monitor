@@ -11,48 +11,61 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 
 st.markdown("""
     <style>
-    /* ── GLOBAL THEME ── */
-    [data-testid="stAppViewContainer"] {
+    /* ── 1. GLOBAL BACKGROUND ── */
+    [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
         background-color: #0d1117 !important;
     }
-    
-    /* ── SIDEBAR FIX (Parameters Column) ── */
-    [data-testid="stSidebar"] {
-        background-color: #161b22 !important;
-        border-right: 1px solid #30363d !important;
-        width: 300px !important;
-    }
-    /* Force Sidebar Text to be White/Visible */
-    [data-testid="stSidebar"] .stMarkdown, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label {
-        color: #e6edf3 !important;
-        font-weight: 500 !important;
+
+    /* ── 2. THE ULTIMATE VISIBILITY FIX (FOR HEADINGS & LABELS) ── */
+    /* This forces ALL text elements to be white/off-white */
+    h1, h2, h3, h4, h5, h6, p, span, label, li, .stMarkdown {
+        color: #ffffff !important;
     }
 
-    /* ── METRIC CARDS ── */
+    /* Specifically target Streamlit Widget Labels (the ones you marked) */
+    [data-testid="stWidgetLabel"] p, [data-testid="stMetricLabel"] p {
+        color: #adbac7 !important; /* A slightly softer grey-white for labels */
+        font-weight: 600 !important;
+        font-size: 14px !important;
+    }
+
+    /* ── 3. METRIC CARDS ── */
     div[data-testid="stMetric"] {
         background: #161b22 !important; 
         border: 1px solid #30363d !important;
         border-radius: 12px !important;
-        padding: 20px !important;
-        transition: transform 0.2s;
-    }
-    div[data-testid="stMetric"]:hover {
-        border-color: #1f6feb !important;
-        transform: translateY(-2px);
-    }
-    div[data-testid="stMetricLabel"] p {
-        color: #8b949e !important; font-size: 13px !important;
-        font-weight: 600 !important; text-transform: uppercase;
+        padding: 15px !important; 
     }
     div[data-testid="stMetricValue"] {
-        color: #ffffff !important; font-size: 30px !important;
+        color: #ffffff !important; 
+        font-size: 28px !important;
+        font-weight: 700 !important;
     }
 
-    /* ── INPUT BOXES (Side Column) ── */
-    .stNumberInput input, .stSelectbox div {
-        background-color: #0d1117 !important;
-        color: white !important;
+    /* ── 4. TABS ── */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #1c2128 !important;
         border: 1px solid #30363d !important;
+        color: #adbac7 !important;
+        padding: 8px 16px !important;
+        border-radius: 4px !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #1f6feb !important;
+        color: white !important;
+        border: 1px solid #1f6feb !important;
+    }
+
+    /* ── 5. SIDEBAR FIX ── */
+    [data-testid="stSidebar"] {
+        background-color: #0d1117 !important;
+        border-right: 1px solid #30363d !important;
+    }
+    [data-testid="stSidebar"] * {
+        color: #ffffff !important;
     }
     </style>
 """, unsafe_allow_html=True)
