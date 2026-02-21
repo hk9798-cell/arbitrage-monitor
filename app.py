@@ -887,23 +887,27 @@ with tab0:
     profitable_found = sum(1 for o in opportunities if o["profitable"])
 
     if profitable_found > 0:
-        banner_col = "#00c896"
+        banner_bg  = "#071a11"
+        banner_bdr = "rgba(0,200,150,0.35)"
+        banner_clr = "#00c896"
         banner_txt = "✅ Found {} Profitable Arbitrage {} Across {} Assets".format(
             profitable_found,
             "Opportunity" if profitable_found == 1 else "Opportunities",
             len(scan_assets))
     else:
-        banner_col = "#525f7a"
+        banner_bg  = "#0f1018"
+        banner_bdr = "rgba(82,95,122,0.4)"
+        banner_clr = "#525f7a"
         banner_txt = "⚪ No Profitable Opportunities Found — Markets Are Efficient"
 
     st.markdown(
-        '<div style="background:{c}; padding:16px; border-radius:12px; text-align:center; '
-        'color:white; margin-bottom:16px;">'
-        '<h2 style="margin:0; font-size:22px;">{t}</h2>'
-        '<p style="margin:6px 0 0; font-size:14px; opacity:.9;">'
-        'PCP: {pcp} &nbsp;|&nbsp; Futures Basis: {fb} &nbsp;|&nbsp; IRP: {irp} &nbsp;|&nbsp; '
-        'Scanned: {na} assets · Next expiry: {exp}</p></div>'.format(
-            c=banner_col, t=banner_txt,
+        '<div style="background:{bg}; border:1px solid {bdr}; border-left:3px solid {clr};'
+        ' padding:14px 18px; border-radius:12px; margin-bottom:16px;">'
+        '<div style="font-size:15px; font-weight:700; color:{clr}; margin-bottom:4px;">{t}</div>'
+        '<div style="font-size:12px; color:#525f7a;">'
+        'PCP: {pcp} &nbsp;·&nbsp; Futures Basis: {fb} &nbsp;·&nbsp; IRP: {irp} &nbsp;·&nbsp; '
+        'Scanned: {na} assets &nbsp;·&nbsp; Next expiry: {exp}</div></div>'.format(
+            bg=banner_bg, bdr=banner_bdr, clr=banner_clr, t=banner_txt,
             pcp=scan_summary["PCP"], fb=scan_summary["FB"], irp=scan_summary["IRP"],
             na=len(scan_assets), exp=scan_expiry.strftime("%d %b %Y")),
         unsafe_allow_html=True)
@@ -1067,7 +1071,7 @@ with tab0:
         st.info("No opportunities found matching your filters. Try lowering the minimum profit threshold or adding more assets.")
 
     if st.session_state.show_metadata:
-        with st.expander("▸ Scanner Methodology", expanded=False):
+        with st.expander("Scanner Methodology", expanded=False):
             st.markdown("""
             **How the scanner works:**
             - **Put-Call Parity**: Uses ATM strike for each asset, computes gap = Spot − Synthetic, deducts STT + brokerage
@@ -1248,15 +1252,26 @@ with tab1:
     m6.metric("Ann. Return",       "{:.2f}%".format(ann_return_pcp),
               delta="{} days".format(days_to_expiry), delta_color="off")
 
+    # Map signal type to dark-bg banner style
+    _banner_styles = {
+        "conversion": ("rgba(0,200,150,0.08)", "rgba(0,200,150,0.35)", "#00c896"),
+        "reversal":   ("rgba(255,77,106,0.08)", "rgba(255,77,106,0.35)", "#ff4d6a"),
+        "none":       ("rgba(82,95,122,0.06)",  "rgba(82,95,122,0.3)",  "#525f7a"),
+    }
+    _bg, _bdr, _clr = _banner_styles[signal_type]
     pulse_class = ""
     st.markdown(
-        '<div style="background:{c}; padding:16px 20px; border-radius:12px; text-align:center; '
-        'color:white; margin:12px 0; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">'
-        '<h2 style="margin:0; font-size:20px; font-weight:800; letter-spacing:-0.02em;">{s}</h2>'
-        '<p style="margin:6px 0 0; font-size:13px; opacity:.85;">'
-        'Strategy: <b>{d}</b> &nbsp;·&nbsp; Expiry: <b>{e}</b> &nbsp;·&nbsp; '
-        '<b>{dte} days</b> &nbsp;·&nbsp; Ann. Return: <b>{ann:.2f}%</b></p></div>'.format(
-            c=signal_color, s=signal_line, d=strategy_desc,
+        '<div style="background:{bg}; border:1px solid {bdr}; border-left:3px solid {clr};'
+        ' padding:14px 18px; border-radius:12px; margin:12px 0;">'
+        '<div style="font-size:16px; font-weight:700; color:{clr}; margin-bottom:5px;">{s}</div>'
+        '<div style="font-size:12px; color:#525f7a;">'
+        'Strategy: <span style="color:#a8b3c8;">{d}</span>'
+        ' &nbsp;·&nbsp; Expiry: <span style="color:#a8b3c8;">{e}</span>'
+        ' &nbsp;·&nbsp; <span style="color:#a8b3c8;">{dte} days</span>'
+        ' &nbsp;·&nbsp; Ann. Return: <span style="color:{clr}; font-weight:700;">{ann:.2f}%</span>'
+        '</div></div>'.format(
+            bg=_bg, bdr=_bdr, clr=_clr,
+            s=signal_line, d=strategy_desc,
             e=expiry_date.strftime("%d %b %Y"), dte=days_to_expiry, ann=ann_return_pcp),
         unsafe_allow_html=True)
 
@@ -1265,27 +1280,27 @@ with tab1:
     alert_threshold = st.session_state.get("alert_threshold", 500)
     if signal_type != "none" and pnl_profitable and net_pnl >= alert_threshold:
         st.markdown(
-            '''<div style="background:linear-gradient(135deg,#05130e,#071a15);
-                border:1px solid rgba(0,200,150,0.4); border-radius:12px; padding:18px 24px;
-                text-align:center; margin:8px 0;
-                box-shadow:0 4px 24px rgba(0,200,150,0.15);">
-              <div style="font-size:26px; margin-bottom:4px;">🚨</div>
-              <div style="font-size:18px;font-weight:800;color:#00c896; letter-spacing:-0.02em;">
-                TRADE SIGNAL — EXECUTE NOW</div>
-              <div style="font-size:13px;color:#4dd9b0;margin-top:6px;line-height:1.6;">
-                Net Profit ₹{pnl:,.2f} &nbsp;·&nbsp; Ann. Return: {ann:.2f}%
-                &nbsp;·&nbsp; Expiry: {exp}
-              </div>
-            </div>'''.format(
-                pnl=net_pnl, thr=alert_threshold,
-                ann=ann_return_pcp, exp=expiry_date.strftime("%d %b %Y")),
+            '<div style="background:rgba(0,200,150,0.07); border:1px solid rgba(0,200,150,0.3);'
+            ' border-left:3px solid #00c896; border-radius:12px; padding:14px 18px; margin:8px 0;">'
+            '<div style="font-size:13px; font-weight:700; color:#00c896; margin-bottom:4px;">🚨 TRADE SIGNAL — EXECUTE NOW</div>'
+            '<div style="font-size:12px; color:#525f7a;">'
+            'Net Profit <span style="color:#a8b3c8;">₹{pnl:,.2f}</span>'
+            ' &nbsp;·&nbsp; Ann. Return <span style="color:#00c896; font-weight:700;">{ann:.2f}%</span>'
+            ' &nbsp;·&nbsp; Expiry <span style="color:#a8b3c8;">{exp}</span>'
+            '</div></div>'.format(
+                pnl=net_pnl, ann=ann_return_pcp,
+                exp=expiry_date.strftime("%d %b %Y")),
             unsafe_allow_html=True)
     elif signal_type != "none" and pnl_profitable:
         st.info("💡 Profitable opportunity found. Raise alert threshold in ⚙️ Settings to trigger the TRADE NOW banner.")
 
     if signal_type != "none" and not pnl_profitable:
-        st.markdown('<div style="background:#1c0a0a; border:1px solid #7f1d1d; border-left:3px solid #ef4444; border-radius:8px; padding:12px 16px; color:#fca5a5; font-size:13px; font-weight:600;">⚠️ Gap detected but NOT profitable after costs. Do not trade.</div>',
-                    unsafe_allow_html=True)
+        st.markdown(
+            '<div style="background:rgba(255,77,106,0.07); border:1px solid rgba(255,77,106,0.3);'
+            ' border-left:3px solid #ff4d6a; border-radius:9px; padding:12px 16px; margin:6px 0;">'
+            '<span style="color:#ff4d6a; font-size:13px; font-weight:600;">'
+            '⚠️ Gap detected but NOT profitable after costs. Do not trade.</span></div>',
+            unsafe_allow_html=True)
 
     # ── PROOF + CHART ─────────────────────────────────────────────────────────
     st.write("")
@@ -1398,7 +1413,7 @@ with tab2:
     If the **market forward rate ≠ theoretical forward**, a covered arbitrage opportunity exists.
     """)
 
-    with st.expander("▸ How IRP Arbitrage Works", expanded=False):
+    with st.expander("How IRP Arbitrage Works", expanded=False):
         st.markdown("""
         **If Market Forward > Theoretical Forward (Forward is too expensive):**
         1. Borrow USD at US risk-free rate for T years
@@ -1476,12 +1491,23 @@ with tab2:
     i5.metric("Net Profit (INR)", "₹{:,.2f}".format(irp_net_inr),
               delta="≈ USD {:,.2f}".format(irp_net_usd), delta_color="off")
 
+    _irp_styles = {
+        "#ff4d6a": ("rgba(255,77,106,0.08)", "rgba(255,77,106,0.35)"),
+        "#00c896": ("rgba(0,200,150,0.08)",  "rgba(0,200,150,0.35)"),
+        "#525f7a": ("rgba(82,95,122,0.06)",  "rgba(82,95,122,0.3)"),
+    }
+    _ibg, _ibdr = _irp_styles.get(irp_color, ("rgba(82,95,122,0.06)", "rgba(82,95,122,0.3)"))
     st.markdown(
-        '<div style="background:{c}; padding:14px; border-radius:10px; text-align:center; color:white; margin:12px 0;">'
-        '<h2 style="margin:0; font-size:20px;">{s}</h2>'
-        '<p style="margin:4px 0 0; font-size:14px; opacity:.9;">Notional: USD {n:,.0f} | Maturity: {e} ({d} days)</p>'
-        '</div>'.format(c=irp_color, s=irp_signal, n=notional_usd,
-                        e=irp_expiry.strftime("%d %b %Y"), d=irp_days),
+        '<div style="background:{bg}; border:1px solid {bdr}; border-left:3px solid {clr};'
+        ' padding:14px 18px; border-radius:12px; margin:12px 0;">'
+        '<div style="font-size:15px; font-weight:700; color:{clr}; margin-bottom:5px;">{s}</div>'
+        '<div style="font-size:12px; color:#525f7a;">'
+        'Notional: <span style="color:#a8b3c8;">USD {n:,.0f}</span>'
+        ' &nbsp;·&nbsp; Maturity: <span style="color:#a8b3c8;">{e} ({d} days)</span>'
+        '</div></div>'.format(
+            bg=_ibg, bdr=_ibdr, clr=irp_color,
+            s=irp_signal, n=notional_usd,
+            e=irp_expiry.strftime("%d %b %Y"), d=irp_days),
         unsafe_allow_html=True)
 
     st.markdown("#### 📐 Detailed Calculation")
@@ -1544,7 +1570,7 @@ with tab3:
     - **If F_mkt < F_fair** → **Reverse Cash & Carry**: Short spot, buy futures, accept delivery
     """)
 
-    with st.expander("▸ How Futures Basis Arbitrage Works", expanded=False):
+    with st.expander("How Futures Basis Arbitrage Works", expanded=False):
         st.markdown("""
         **Cash & Carry (Futures overpriced):**
         1. Borrow money at risk-free rate for T years
@@ -1631,13 +1657,23 @@ with tab3:
               delta="Profitable ✅" if fb_profitable else "Loss ❌",
               delta_color="normal" if fb_profitable else "inverse")
 
+    _fb_styles = {
+        "#00c896": ("rgba(0,200,150,0.08)",  "rgba(0,200,150,0.35)"),
+        "#ff4d6a": ("rgba(255,77,106,0.08)", "rgba(255,77,106,0.35)"),
+        "#525f7a": ("rgba(82,95,122,0.06)",  "rgba(82,95,122,0.3)"),
+    }
+    _fbbg, _fbbdr = _fb_styles.get(fb_color, ("rgba(82,95,122,0.06)", "rgba(82,95,122,0.3)"))
     st.markdown(
-        '<div style="background:{c}; padding:16px 20px; border-radius:12px; text-align:center;'
-        ' color:white; margin:12px 0; box-shadow:0 4px 16px rgba(0,0,0,0.3);">'
-        '<h2 style="margin:0; font-size:20px; font-weight:800; letter-spacing:-0.02em;">{s}</h2>'
-        '<p style="margin:6px 0 0; font-size:13px; opacity:.85;">Strategy: {st} &nbsp;·&nbsp; Expiry: {e} ({d} days)</p>'
-        '</div>'.format(c=fb_color, s=fb_signal, st=fb_strategy,
-                        e=fb_expiry.strftime("%d %b %Y"), d=fb_days),
+        '<div style="background:{bg}; border:1px solid {bdr}; border-left:3px solid {clr};'
+        ' padding:14px 18px; border-radius:12px; margin:12px 0;">'
+        '<div style="font-size:15px; font-weight:700; color:{clr}; margin-bottom:5px;">{s}</div>'
+        '<div style="font-size:12px; color:#525f7a;">'
+        'Strategy: <span style="color:#a8b3c8;">{st}</span>'
+        ' &nbsp;·&nbsp; Expiry: <span style="color:#a8b3c8;">{e} ({d} days)</span>'
+        '</div></div>'.format(
+            bg=_fbbg, bdr=_fbbdr, clr=fb_color,
+            s=fb_signal, st=fb_strategy,
+            e=fb_expiry.strftime("%d %b %Y"), d=fb_days),
         unsafe_allow_html=True)
 
     if fb_basis != 0 and not fb_profitable:
