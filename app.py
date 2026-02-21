@@ -11,43 +11,45 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 
 st.markdown("""
     <style>
-    /* ── 1. GLOBAL COLORS ── */
+    /* 1. FORCE THE WHOLE APP BACKGROUND */
     [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stSidebar"] {
         background-color: #0d1117 !important;
     }
 
-    /* ── 2. FORCE ALL TEXT TO WHITE ── */
-    h1, h2, h3, h4, h5, h6, p, span, label, li, .stMarkdown {
-        color: #ffffff !important;
-    }
-
-    /* ── 3. DROPDOWN & INPUT BOX TEXT (The Asset / Brokerage Fix) ── */
-    /* This forces the text INSIDE the selectbox and number inputs to be visible */
-    input, [data-baseweb="select"] * {
-        color: #ffffff !important;
-        fill: #ffffff !important;
-    }
-    
-    div[data-baseweb="select"] > div, 
-    div[data-testid="stSelectbox"] div, 
-    div[data-testid="stNumberInput"] input {
+    /* 2. THE DROPDOWN & LISTBOX FIX (The missing Asset names) */
+    /* This targets the actual dropdown box */
+    div[data-baseweb="select"] > div {
         background-color: #1c2128 !important;
         border: 1px solid #30363d !important;
     }
-
-    /* ── 4. THE DROPDOWN LIST (The Pop-up menu) ── */
-    /* When you click the dropdown, the list needs a dark background too */
-    div[role="listbox"] {
-        background-color: #1c2128 !important;
-    }
-    div[role="option"] {
+    
+    /* This forces the text INSIDE the box and the LIST items to be white */
+    div[data-baseweb="select"] *, div[role="listbox"] *, div[role="option"] * {
         color: #ffffff !important;
     }
+
+    /* Force the background of the pop-up list to be dark so white text is visible */
+    div[role="listbox"], div[role="option"] {
+        background-color: #1c2128 !important;
+    }
+
+    /* Highlight color when you hover over an asset name */
     div[role="option"]:hover {
         background-color: #1f6feb !important;
     }
 
-    /* ── 5. METRIC CARDS & TABS ── */
+    /* 3. UNIVERSAL TEXT VISIBILITY (Headers, Labels, Sidebar) */
+    h1, h2, h3, h4, h5, h6, p, span, label, li, .stMarkdown {
+        color: #ffffff !important;
+    }
+
+    /* Specifically target Sidebar labels like "Brokerage" */
+    [data-testid="stWidgetLabel"] p {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+    }
+
+    /* 4. METRIC CARDS */
     div[data-testid="stMetric"] {
         background: #161b22 !important; 
         border: 1px solid #30363d !important;
@@ -55,14 +57,18 @@ st.markdown("""
     }
     div[data-testid="stMetricLabel"] p {
         color: #8b949e !important;
+        font-size: 12px !important;
     }
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
+    div[data-testid="stMetricValue"] {
+        color: #ffffff !important;
     }
+
+    /* 5. TABS */
+    .stTabs [data-baseweb="tab-list"] { background-color: transparent !important; }
     .stTabs [data-baseweb="tab"] {
         background-color: #1c2128 !important;
+        border: 1px solid #30363d !important;
         color: #adbac7 !important;
-        border-radius: 4px !important;
     }
     .stTabs [aria-selected="true"] {
         background-color: #1f6feb !important;
