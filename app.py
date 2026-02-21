@@ -9,21 +9,6 @@ import json
 import datetime
 st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", page_icon="🏛️")
 
-Conversation with Gemini
-You said
-i made this script as a part of my college project. everything working fine but i am not like dashboard and labels, font, background color combination. its looking very poor.
-
-Gemini said
-The visual "heaviness" in your script comes from the very dark navy/grey background (#1a2332) paired with high-contrast borders and neon accents, which can feel dated or "over-designed."
-
-To give it a modern, professional "Fintech" look (similar to Bloomberg or Zerodha), I recommend three key changes: Switching to a cleaner dark theme, simplifying borders, and standardizing typography.
-
-Here is the updated CSS block and the header HTML for your script. Replace the corresponding sections in your app_v6-6.py:
-
-1. Improved CSS (The Style Block)
-Replace your existing st.markdown(""" <style> ... </style> """) section with this:
-
-Python
 st.markdown("""
     <style>
     /* ── GLOBAL THEME ── */
