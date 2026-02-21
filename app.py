@@ -11,64 +11,57 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 
 st.markdown("""
     <style>
-    /* 1. GLOBAL BACKGROUND & SIDEBAR */
+    /* ── 1. GLOBAL COLORS ── */
     [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stSidebar"] {
         background-color: #0d1117 !important;
     }
 
-    /* 2. UNIVERSAL TEXT (Headings & Labels) */
+    /* ── 2. FORCE ALL TEXT TO WHITE ── */
     h1, h2, h3, h4, h5, h6, p, span, label, li, .stMarkdown {
         color: #ffffff !important;
     }
 
-    /* 3. INPUT BOXES & DROPDOWNS (This fixes the missing Asset/Brokerage text) */
-    /* Target the container, the input, and the dropdown menu */
+    /* ── 3. DROPDOWN & INPUT BOX TEXT (The Asset / Brokerage Fix) ── */
+    /* This forces the text INSIDE the selectbox and number inputs to be visible */
+    input, [data-baseweb="select"] * {
+        color: #ffffff !important;
+        fill: #ffffff !important;
+    }
+    
     div[data-baseweb="select"] > div, 
     div[data-testid="stSelectbox"] div, 
     div[data-testid="stNumberInput"] input {
         background-color: #1c2128 !important;
-        color: #ffffff !important;
         border: 1px solid #30363d !important;
     }
-    
-    /* Target the text inside the dropdown list */
-    ul[role="listbox"] li {
-        color: #000000 !important; /* Keep list text black so it's readable on white background */
-    }
 
-    /* 4. SIDEBAR SPECIFIC LABELS */
-    [data-testid="stWidgetLabel"] p {
+    /* ── 4. THE DROPDOWN LIST (The Pop-up menu) ── */
+    /* When you click the dropdown, the list needs a dark background too */
+    div[role="listbox"] {
+        background-color: #1c2128 !important;
+    }
+    div[role="option"] {
         color: #ffffff !important;
-        font-weight: 600 !important;
+    }
+    div[role="option"]:hover {
+        background-color: #1f6feb !important;
     }
 
-    /* 5. METRIC CARDS */
+    /* ── 5. METRIC CARDS & TABS ── */
     div[data-testid="stMetric"] {
         background: #161b22 !important; 
         border: 1px solid #30363d !important;
         border-radius: 12px !important;
-        padding: 15px !important; 
     }
     div[data-testid="stMetricLabel"] p {
         color: #8b949e !important;
-        font-size: 12px !important;
-        text-transform: uppercase;
     }
-    div[data-testid="stMetricValue"] {
-        color: #ffffff !important; 
-        font-size: 28px !important;
-        font-weight: 700 !important;
-    }
-
-    /* 6. TABS */
     .stTabs [data-baseweb="tab-list"] {
         gap: 10px;
     }
     .stTabs [data-baseweb="tab"] {
         background-color: #1c2128 !important;
-        border: 1px solid #30363d !important;
         color: #adbac7 !important;
-        padding: 8px 16px !important;
         border-radius: 4px !important;
     }
     .stTabs [aria-selected="true"] {
