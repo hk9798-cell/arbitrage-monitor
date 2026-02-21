@@ -11,52 +11,48 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 
 st.markdown("""
     <style>
-    /* ── GLOBAL THEME & FORCE READABILITY ── */
+    /* ── GLOBAL THEME ── */
     [data-testid="stAppViewContainer"] {
         background-color: #0d1117 !important;
     }
     
-    /* FORCE TEXT VISIBILITY: This is the fix for "can't read anything" */
-    p, span, label, .stMarkdown, .stText, [data-testid="stWidgetLabel"] p, li {
-        color: #e6edf3 !important; /* High contrast off-white */
+    /* ── SIDEBAR FIX (Parameters Column) ── */
+    [data-testid="stSidebar"] {
+        background-color: #161b22 !important;
+        border-right: 1px solid #30363d !important;
+        width: 300px !important;
+    }
+    /* Force Sidebar Text to be White/Visible */
+    [data-testid="stSidebar"] .stMarkdown, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label {
+        color: #e6edf3 !important;
+        font-weight: 500 !important;
     }
 
-    /* Force all Headings to be Pure White */
-    h1, h2, h3, h4, h5, h6 {
-        color: #ffffff !important;
-        font-weight: 700 !important;
-    }
-
-    /* Metric Cards - High Visibility */
+    /* ── METRIC CARDS ── */
     div[data-testid="stMetric"] {
         background: #161b22 !important; 
         border: 1px solid #30363d !important;
-        border-radius: 10px !important;
-        padding: 15px !important; 
+        border-radius: 12px !important;
+        padding: 20px !important;
+        transition: transform 0.2s;
+    }
+    div[data-testid="stMetric"]:hover {
+        border-color: #1f6feb !important;
+        transform: translateY(-2px);
     }
     div[data-testid="stMetricLabel"] p {
-        color: #8b949e !important; 
-        font-size: 12px !important;
-        font-weight: 600 !important;
+        color: #8b949e !important; font-size: 13px !important;
+        font-weight: 600 !important; text-transform: uppercase;
     }
     div[data-testid="stMetricValue"] {
-        color: #ffffff !important; 
-        font-size: 28px !important;
-        font-weight: 700 !important;
+        color: #ffffff !important; font-size: 30px !important;
     }
 
-    /* Tabs Styling */
-    .stTabs [data-baseweb="tab-list"] {
-        background-color: transparent !important;
-    }
-    .stTabs [data-baseweb="tab"] {
-        background-color: #1c2128 !important;
-        border: 1px solid #30363d !important;
-        color: #8b949e !important;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #1f6feb !important;
+    /* ── INPUT BOXES (Side Column) ── */
+    .stNumberInput input, .stSelectbox div {
+        background-color: #0d1117 !important;
         color: white !important;
+        border: 1px solid #30363d !important;
     }
     </style>
 """, unsafe_allow_html=True)
