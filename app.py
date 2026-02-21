@@ -336,22 +336,15 @@ st.markdown("""
         margin-bottom: 6px !important;
     }
     details summary {
-        color: #525f7a !important;
+        color: #6b7a99 !important;
         font-weight: 600 !important;
         font-size: 13px !important;
         padding: 8px 4px !important;
         cursor: pointer;
         letter-spacing: 0.01em;
-        transition: color 0.2s;
         list-style: none !important;
     }
     details summary::-webkit-details-marker { display: none; }
-    details summary::before {
-        content: '▸ ';
-        color: #c9a84c;
-        font-size: 11px;
-    }
-    details[open] summary::before { content: '▾ '; }
     details[open] summary {
         color: #a8b3c8 !important;
         border-bottom: 1px solid #1e2336;
