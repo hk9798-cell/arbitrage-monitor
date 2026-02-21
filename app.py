@@ -10,13 +10,6 @@ import datetime
 st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", page_icon="🏛️")
 
 st.markdown("""
-    I understand the frustration. The reason the Asset names and Brokerage inputs "disappeared" is that Streamlit's input widgets (like selectboxes and text inputs) have an internal white background with black text by default. When we forced the background dark, the text stayed dark, making it invisible.
-
-To fix this once and for all, replace the entire <style> block (Lines 12–94) with this "Total Visibility" version. It includes the specific code needed to make the dropdown menus and input fields readable.
-
-1. The Total Visibility CSS (Replace Lines 12–94)
-Python
-st.markdown("""
     <style>
     /* 1. GLOBAL BACKGROUND & SIDEBAR */
     [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stSidebar"] {
