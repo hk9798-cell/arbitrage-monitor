@@ -11,127 +11,95 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 
 st.markdown("""
     <style>
-    /* ── CLEAN PROFESSIONAL THEME ── */
-    .main { background-color: #f7f8fc; }
+    /* ── BACKGROUND ── */
+    .main, .stApp { background-color: #eef2f7 !important; }
+    .stTabs [data-baseweb="tab-panel"] { background-color: #eef2f7 !important; }
 
-    /* Labels */
-    label[data-testid="stWidgetLabel"] p {
-        font-weight: 600 !important; font-size: 13px !important; color: #374151 !important;
-    }
+    /* ── SIDEBAR ── */
+    section[data-testid="stSidebar"] { background-color: #1e3a5f !important; }
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] span,
+    section[data-testid="stSidebar"] div,
+    section[data-testid="stSidebar"] label { color: #cbd5e1 !important; }
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3 { color: #ffffff !important; font-weight: 700 !important; }
+    section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p { color: #94a3b8 !important; font-size:12px !important; }
 
-    /* Metric cards */
-    div[data-testid="stMetricLabel"] p {
-        font-weight: 600 !important; font-size: 12px !important;
-        color: #6b7280 !important; text-transform: uppercase; letter-spacing: 0.04em;
-    }
-    div[data-testid="stMetricValue"] {
-        font-size: 22px !important; color: #111827 !important; font-weight: 800 !important;
-    }
-    div[data-testid="stMetric"] {
-        background: #ffffff !important; border-radius: 10px !important;
-        padding: 14px 16px !important; border: 1px solid #e5e7eb !important;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important;
-    }
-
-    /* Tabs */
+    /* ── TABS ── */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: #ffffff !important;
-        border-radius: 10px !important; padding: 4px !important;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important; gap: 2px !important;
+        background-color: #ffffff !important; border-radius: 10px !important;
+        padding: 4px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.1) !important;
     }
     .stTabs [data-baseweb="tab"] {
         border-radius: 7px !important; font-weight: 600 !important;
         font-size: 13px !important; color: #374151 !important; padding: 8px 16px !important;
     }
-    .stTabs [aria-selected="true"] {
-        background-color: #1e3a5f !important; color: #ffffff !important;
+    .stTabs [aria-selected="true"] { background-color: #1e3a5f !important; color: #ffffff !important; }
+
+    /* ── METRIC CARDS ── */
+    div[data-testid="stMetric"] {
+        background: #ffffff !important; border-radius: 12px !important;
+        padding: 16px 18px !important; border: none !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+    }
+    div[data-testid="stMetricLabel"] p {
+        font-weight: 600 !important; font-size: 11px !important;
+        color: #6b7280 !important; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: 24px !important; color: #111827 !important; font-weight: 800 !important;
     }
 
-    /* Sidebar */
-    section[data-testid="stSidebar"] {
-        background-color: #1e3a5f !important;
-    }
-    section[data-testid="stSidebar"] p,
-    section[data-testid="stSidebar"] label,
-    section[data-testid="stSidebar"] span,
-    section[data-testid="stSidebar"] div {
-        color: #e2e8f0 !important;
-    }
-    section[data-testid="stSidebar"] h1,
-    section[data-testid="stSidebar"] h2,
-    section[data-testid="stSidebar"] h3 {
-        color: #ffffff !important; font-weight: 700 !important;
-    }
-    section[data-testid="stSidebar"] .stMarkdown p {
-        color: #cbd5e1 !important;
-    }
-    section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
-        color: #94a3b8 !important; font-size: 12px !important;
+    /* ── WIDGET LABELS ── */
+    label[data-testid="stWidgetLabel"] p { font-weight: 600 !important; font-size: 13px !important; color: #374151 !important; }
+
+    /* ── INPUTS ── */
+    .stNumberInput input, .stTextInput input {
+        background: #ffffff !important; border: 1.5px solid #d1d5db !important;
+        border-radius: 8px !important; color: #111827 !important; font-size: 14px !important;
     }
 
-    /* Custom cards */
-    .warning-box {
-        background-color: #fffbeb; border-left: 5px solid #f59e0b;
-        padding: 10px 16px; border-radius: 8px; color: #92400e;
-        font-weight: 500; margin-top: 8px;
-    }
-    .nse-link-box {
-        background-color: #eff6ff; border-left: 5px solid #3b82f6;
-        padding: 10px 16px; border-radius: 8px; color: #1e40af;
-        font-size: 14px; margin-top: 6px;
-    }
-    .nse-link-box a { color: #2563eb !important; font-weight: 600; }
-    .opp-card-green {
-        background: linear-gradient(135deg, #f0fdf4, #dcfce7);
-        border-left: 6px solid #16a34a; border-radius: 12px;
-        padding: 14px 18px; margin-bottom: 10px;
-        box-shadow: 0 2px 8px rgba(22,163,74,0.1);
-    }
-    .opp-card-red {
-        background: linear-gradient(135deg, #fff1f2, #ffe4e6);
-        border-left: 6px solid #dc2626; border-radius: 12px;
-        padding: 14px 18px; margin-bottom: 10px;
-        box-shadow: 0 2px 8px rgba(220,38,38,0.08);
-    }
-    .opp-card-grey {
-        background: #f9fafb; border-left: 6px solid #9ca3af;
-        border-radius: 12px; padding: 14px 18px; margin-bottom: 10px;
-    }
-    .scanner-badge {
-        display: inline-block; padding: 3px 10px; border-radius: 20px;
-        font-size: 11px; font-weight: 700; margin-right: 6px;
-    }
-
-    /* Buttons */
+    /* ── BUTTONS ── */
     .stButton > button {
         background-color: #1e3a5f !important; color: #ffffff !important;
         font-weight: 700 !important; border: none !important;
-        border-radius: 8px !important; padding: 8px 20px !important;
+        border-radius: 8px !important; padding: 10px 24px !important; font-size: 14px !important;
+        box-shadow: 0 2px 8px rgba(30,58,95,0.25) !important;
     }
-    .stButton > button:hover {
-        background-color: #2d5282 !important;
-        box-shadow: 0 4px 12px rgba(30,58,95,0.3) !important;
-    }
+    .stButton > button:hover { background-color: #2d5282 !important; }
 
-    /* Multiselect tags */
-    span[data-baseweb="tag"] {
-        background-color: #1e3a5f !important; border-radius: 20px !important;
-    }
+    /* ── MULTISELECT TAGS ── */
+    span[data-baseweb="tag"] { background-color: #1e3a5f !important; border-radius: 20px !important; }
     span[data-baseweb="tag"] span { color: #ffffff !important; font-weight: 600 !important; }
 
-    /* Expander */
+    /* ── EXPANDER ── */
     .streamlit-expanderHeader {
         background-color: #ffffff !important; border-radius: 8px !important;
-        font-weight: 600 !important; color: #1e3a5f !important;
-        border: 1px solid #e5e7eb !important;
+        font-weight: 700 !important; color: #1e3a5f !important; border: 1px solid #e5e7eb !important;
+        font-size: 14px !important;
     }
-    .streamlit-expanderContent {
-        background-color: #ffffff !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 0 0 8px 8px !important;
-    }
+    .streamlit-expanderContent { background-color: #ffffff !important; border: 1px solid #e5e7eb !important; }
 
-    /* Animations */
+    /* ── DATAFRAME ── */
+    .stDataFrame thead th { background-color: #1e3a5f !important; color: #ffffff !important; font-weight: 700 !important; }
+    .stDataFrame tbody tr:nth-child(even) { background-color: #f8fafc !important; }
+
+    /* ── SCANNER BADGES ── */
+    .scanner-badge { display:inline-block; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:700; margin-right:6px; }
+
+    /* ── CUSTOM BOXES ── */
+    .warning-box {
+        background-color: #fffbeb; border-left: 5px solid #f59e0b;
+        padding: 12px 16px; border-radius: 8px; color: #92400e; font-weight: 500;
+    }
+    .nse-link-box {
+        background-color: #eff6ff; border-left: 5px solid #3b82f6;
+        padding: 12px 16px; border-radius: 8px; color: #1e40af; font-size: 14px;
+    }
+    .nse-link-box a { color: #2563eb !important; font-weight: 600; }
+
+    /* ── ANIMATIONS ── */
     @keyframes pulse-green {
         0%,100% { box-shadow: 0 0 0 0 rgba(22,163,74,0.4); }
         50%      { box-shadow: 0 0 0 8px rgba(22,163,74,0); }
@@ -142,6 +110,15 @@ st.markdown("""
     }
     .signal-pulse-green { animation: pulse-green 2s infinite; border-radius: 12px; }
     .signal-pulse-red   { animation: pulse-red   2s infinite; border-radius: 12px; }
+
+    /* ── MOBILE RESPONSIVE ── */
+    @media (max-width: 768px) {
+        div[data-testid="stMetricValue"] { font-size: 18px !important; }
+        .stTabs [data-baseweb="tab"] { font-size: 11px !important; padding: 6px 10px !important; }
+        h1 { font-size: 1.4rem !important; }
+        h2 { font-size: 1.1rem !important; }
+        h3 { font-size: 1rem !important; }
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -231,9 +208,9 @@ with st.spinner(""):
 
 now_str = datetime.datetime.now().strftime("%H:%M:%S")
 ticker_html = '''<div style="background:#1e3a5f;
-    border-radius:10px; padding:10px 20px;
+    border-radius:10px; padding:12px 20px;
     margin-bottom:16px; display:flex; gap:0; flex-wrap:wrap; align-items:center;
-    box-shadow: 0 2px 8px rgba(30,58,95,0.2);">
+    box-shadow: 0 3px 10px rgba(30,58,95,0.2);">
     <span style="font-size:11px;color:#93c5fd;font-weight:700;
           margin-right:20px;letter-spacing:0.1em;">● LIVE MARKET</span>'''
 
@@ -630,43 +607,71 @@ with tab0:
             }
             sc = strategy_colors.get(opp["strategy"], "#6b7280")
 
-            st.markdown(
-                '<div class="{cls}">'
-                '<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">'
-                '<div>'
-                '  <span class="scanner-badge" style="background:{sc};color:white;">#{n} {strat}</span>'
-                '  <span class="scanner-badge" style="background:#495057;color:white;">{asset}</span>'
-                '  {badge}'
+            pnl_color   = "#155724" if opp["profitable"] else "#495057"
+            border_col  = "#16a34a" if opp["profitable"] else "#9ca3af"
+            bg_col      = "#f0fdf4" if opp["profitable"] else "#f9fafb"
+            spot_prefix = "Rs." if opp["asset"] != "USD/INR" else ""
+
+            card_html = (
+                '<div style="background:{bg};border-left:5px solid {bc};border-radius:10px;'
+                'padding:16px 20px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.07);">'
+
+                '<div style="display:flex;justify-content:space-between;'
+                'align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
+                '<div style="display:flex;flex-wrap:wrap;gap:6px;">'
+                '<span style="background:{sc};color:#fff;padding:4px 12px;border-radius:20px;'
+                'font-size:12px;font-weight:700;">#{n} {strat}</span>'
+                '<span style="background:#374151;color:#fff;padding:4px 12px;border-radius:20px;'
+                'font-size:12px;font-weight:700;">{asset}</span>'
+                '{badge}'
                 '</div>'
-                '<div style="font-size:22px; font-weight:700; color:{pnl_col};">Net ₹{pnl:,.2f}</div>'
+                '<div style="font-size:20px;font-weight:800;color:{pnl_col};">Net Rs.{pnl:,.2f}</div>'
                 '</div>'
-                '<div style="margin-top:8px; display:flex; gap:24px; flex-wrap:wrap; font-size:13px;">'
-                '  <span>📊 <b>Type:</b> {typ}</span>'
-                '  <span>💹 <b>Spot:</b> {spot_label} {spot_val}</span>'
-                '  <span>📈 <b>Gap:</b> {gap:.4f}</span>'
-                '  <span>💰 <b>Gross:</b> ₹{gross:,.2f}</span>'
-                '  <span>🧾 <b>Friction:</b> ₹{fric:,.2f}</span>'
-                '  <span>📅 <b>Expiry:</b> {exp} ({days}d)</span>'
-                '  <span>🚀 <b>Ann. Return:</b> {ann:.2f}%</span>'
-                '  <span>📡 <b>Data:</b> {src}</span>'
+
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;'
+                'margin-bottom:12px;">'
+                '<div style="font-size:13px;color:#1f2937;">'
+                '<div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;'
+                'letter-spacing:0.05em;margin-bottom:2px;">Type</div>'
+                '<b>{typ}</b></div>'
+                '<div style="font-size:13px;color:#1f2937;">'
+                '<div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;'
+                'letter-spacing:0.05em;margin-bottom:2px;">Spot Price</div>'
+                '<b>{sp}{spot_val}</b></div>'
+                '<div style="font-size:13px;color:#1f2937;">'
+                '<div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;'
+                'letter-spacing:0.05em;margin-bottom:2px;">Gross P&amp;L</div>'
+                '<b>Rs.{gross:,.2f}</b></div>'
+                '<div style="font-size:13px;color:#1f2937;">'
+                '<div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;'
+                'letter-spacing:0.05em;margin-bottom:2px;">Transaction Cost</div>'
+                '<b>Rs.{fric:,.2f}</b></div>'
+                '<div style="font-size:13px;color:#1f2937;">'
+                '<div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;'
+                'letter-spacing:0.05em;margin-bottom:2px;">Expiry</div>'
+                '<b>{exp} ({days} days)</b></div>'
+                '<div style="font-size:13px;">'
+                '<div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;'
+                'letter-spacing:0.05em;margin-bottom:2px;">Ann. Return</div>'
+                '<b style="font-size:16px;color:#16a34a;">{ann:.2f}%</b></div>'
                 '</div>'
-                '<div style="margin-top:6px; font-size:13px; color:#495057;">'
-                '  ▶ <b>Execution:</b> {action}'
+
+                '<div style="background:rgba(30,58,95,0.07);border-radius:7px;'
+                'padding:10px 14px;font-size:13px;color:#1e3a5f;font-weight:500;">'
+                '<b>Execution Strategy:</b> {action}'
                 '</div>'
-                '</div>'.format(
-                    cls=card_class, sc=sc, n=i+1,
-                    strat=opp["strategy"], asset=opp["asset"], badge=profit_badge,
-                    pnl_col="#155724" if opp["profitable"] else "#495057",
-                    pnl=opp["net_pnl"],
-                    typ=opp["type"],
-                    spot_label="₹" if opp["asset"] != "USD/INR" else "",
-                    spot_val="{:,.2f}".format(opp["spot"]),
-                    gap=opp["gap"],
-                    gross=opp["gross"], fric=opp["friction"],
-                    exp=opp["expiry"].strftime("%d %b %Y"), days=opp["days"],
-                    ann=opp["ann_return"], src=opp["data_src"],
-                    action=opp["action"]),
-                unsafe_allow_html=True)
+                '</div>'
+            ).format(
+                bg=bg_col, bc=border_col, sc=sc, n=i+1,
+                strat=opp["strategy"], asset=opp["asset"], badge=profit_badge,
+                pnl_col=pnl_color, pnl=opp["net_pnl"],
+                typ=opp["type"],
+                sp=spot_prefix, spot_val="{:,.2f}".format(opp["spot"]),
+                gross=opp["gross"], fric=opp["friction"],
+                exp=opp["expiry"].strftime("%d %b %Y"), days=opp["days"],
+                ann=opp["ann_return"], action=opp["action"])
+
+            st.markdown(card_html, unsafe_allow_html=True)
 
         # ── Comparison bar chart ───────────────────────────────────────────
         if len(opportunities) > 1:
