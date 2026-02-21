@@ -11,271 +11,137 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 
 st.markdown("""
     <style>
-    /* ── GOOGLE FONT IMPORT ── */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    /* ── CLEAN PROFESSIONAL THEME ── */
+    .main { background-color: #f7f8fc; }
 
-    /* ── GLOBAL ── */
-    html, body, [class*="css"], .stApp {
-        font-family: 'Inter', sans-serif !important;
-        background-color: #f4f6f9 !important;
-        color: #1a1a2e !important;
+    /* Labels */
+    label[data-testid="stWidgetLabel"] p {
+        font-weight: 600 !important; font-size: 13px !important; color: #374151 !important;
     }
 
-    /* ── SIDEBAR ── */
+    /* Metric cards */
+    div[data-testid="stMetricLabel"] p {
+        font-weight: 600 !important; font-size: 12px !important;
+        color: #6b7280 !important; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: 22px !important; color: #111827 !important; font-weight: 800 !important;
+    }
+    div[data-testid="stMetric"] {
+        background: #ffffff !important; border-radius: 10px !important;
+        padding: 14px 16px !important; border: 1px solid #e5e7eb !important;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important;
+    }
+
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #ffffff !important;
+        border-radius: 10px !important; padding: 4px !important;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important; gap: 2px !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 7px !important; font-weight: 600 !important;
+        font-size: 13px !important; color: #374151 !important; padding: 8px 16px !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #1e3a5f !important; color: #ffffff !important;
+    }
+
+    /* Sidebar */
     section[data-testid="stSidebar"] {
-        background-color: #1a1a2e !important;
-        border-right: 3px solid #e8eaf0 !important;
+        background-color: #1e3a5f !important;
     }
-    section[data-testid="stSidebar"] * {
-        color: #e0e0e0 !important;
-        font-family: 'Inter', sans-serif !important;
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] span,
+    section[data-testid="stSidebar"] div {
+        color: #e2e8f0 !important;
     }
     section[data-testid="stSidebar"] h1,
     section[data-testid="stSidebar"] h2,
-    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] h3 {
+        color: #ffffff !important; font-weight: 700 !important;
+    }
     section[data-testid="stSidebar"] .stMarkdown p {
-        color: #ffffff !important;
-        font-weight: 700 !important;
+        color: #cbd5e1 !important;
     }
-    section[data-testid="stSidebar"] .stCaption p {
-        color: #9e9e9e !important;
-        font-size: 11px !important;
-    }
-    section[data-testid="stSidebar"] .stNumberInput input,
-    section[data-testid="stSidebar"] .stSelectbox > div > div {
-        background-color: #2d2d44 !important;
-        color: #ffffff !important;
-        border: 1px solid #3d3d5c !important;
-        border-radius: 8px !important;
-    }
-    /* Sidebar slider track */
-    section[data-testid="stSidebar"] .stSlider [data-baseweb="slider"] div[role="slider"] {
-        background-color: #4a90d9 !important;
-    }
-    /* Auto-refresh info box in sidebar */
-    section[data-testid="stSidebar"] .stInfo {
-        background-color: #2d2d44 !important;
-        border-color: #4a90d9 !important;
+    section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
+        color: #94a3b8 !important; font-size: 12px !important;
     }
 
-    /* ── TABS ── */
-    .stTabs [data-baseweb="tab-list"] {
-        background-color: #ffffff !important;
-        border-radius: 12px !important;
-        padding: 6px !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
-        gap: 4px !important;
-    }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 8px !important;
-        font-weight: 600 !important;
-        font-size: 13px !important;
-        color: #555 !important;
-        padding: 8px 18px !important;
-        font-family: 'Inter', sans-serif !important;
-    }
-    .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #1a1a2e, #2d3561) !important;
-        color: #ffffff !important;
-        box-shadow: 0 2px 6px rgba(26,26,46,0.3) !important;
-    }
-    .stTabs [data-baseweb="tab-panel"] {
-        background-color: #f4f6f9 !important;
-        padding-top: 16px !important;
-    }
-
-    /* ── METRIC CARDS ── */
-    div[data-testid="stMetric"] {
-        background: #ffffff !important;
-        border-radius: 12px !important;
-        padding: 14px 18px !important;
-        border: none !important;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.07) !important;
-    }
-    div[data-testid="stMetricLabel"] p {
-        font-weight: 600 !important;
-        font-size: 11px !important;
-        color: #888 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.06em !important;
-        font-family: 'Inter', sans-serif !important;
-    }
-    div[data-testid="stMetricValue"] {
-        font-size: 22px !important;
-        font-weight: 800 !important;
-        color: #1a1a2e !important;
-        font-family: 'Inter', sans-serif !important;
-    }
-    div[data-testid="stMetricDelta"] {
-        font-size: 12px !important;
-        font-weight: 600 !important;
-    }
-
-    /* ── HEADINGS ── */
-    h1, h2, h3, h4 {
-        font-family: 'Inter', sans-serif !important;
-        color: #1a1a2e !important;
-        font-weight: 800 !important;
-    }
-    h1 { font-size: 1.9rem !important; }
-    h2 { font-size: 1.4rem !important; }
-    h3 { font-size: 1.1rem !important; }
-
-    /* ── PARAGRAPHS & LABELS ── */
-    p, li, span {
-        font-family: 'Inter', sans-serif !important;
-        color: #2c2c3e !important;
-    }
-    label[data-testid="stWidgetLabel"] p {
-        font-weight: 600 !important;
-        font-size: 13px !important;
-        color: #444 !important;
-    }
-    .stCaption p {
-        color: #888 !important;
-        font-size: 12px !important;
-    }
-
-    /* ── INPUTS ── */
-    .stNumberInput input, .stTextInput input {
-        border-radius: 8px !important;
-        border: 1.5px solid #dde2ec !important;
-        font-family: 'Inter', sans-serif !important;
-        font-size: 14px !important;
-        background: #ffffff !important;
-        color: #1a1a2e !important;
-        padding: 8px 12px !important;
-    }
-    .stSelectbox > div > div {
-        border-radius: 8px !important;
-        border: 1.5px solid #dde2ec !important;
-        background: #ffffff !important;
-        font-family: 'Inter', sans-serif !important;
-    }
-
-    /* ── BUTTONS ── */
-    .stButton > button {
-        background: linear-gradient(135deg, #1a1a2e, #2d3561) !important;
-        color: #ffffff !important;
-        font-weight: 700 !important;
-        font-family: 'Inter', sans-serif !important;
-        border: none !important;
-        border-radius: 10px !important;
-        padding: 10px 24px !important;
-        font-size: 14px !important;
-        letter-spacing: 0.02em !important;
-        transition: all 0.2s ease !important;
-        box-shadow: 0 3px 10px rgba(26,26,46,0.25) !important;
-    }
-    .stButton > button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 16px rgba(26,26,46,0.35) !important;
-    }
-
-    /* ── DATAFRAME ── */
-    .stDataFrame { border-radius: 12px !important; overflow: hidden !important;
-                   box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important; }
-    .stDataFrame thead th {
-        background-color: #1a1a2e !important;
-        color: #ffffff !important;
-        font-weight: 700 !important;
-        font-size: 13px !important;
-        font-family: 'Inter', sans-serif !important;
-    }
-    .stDataFrame tbody tr:nth-child(even) { background-color: #f8f9fb !important; }
-    .stDataFrame tbody td {
-        font-size: 13px !important;
-        font-family: 'Inter', sans-serif !important;
-        color: #2c2c3e !important;
-    }
-
-    /* ── EXPANDER ── */
-    .streamlit-expanderHeader {
-        background-color: #ffffff !important;
-        border-radius: 10px !important;
-        font-weight: 700 !important;
-        font-family: 'Inter', sans-serif !important;
-        color: #1a1a2e !important;
-        border: 1px solid #e8eaf0 !important;
-    }
-    .streamlit-expanderContent {
-        background-color: #ffffff !important;
-        border: 1px solid #e8eaf0 !important;
-        border-radius: 0 0 10px 10px !important;
-    }
-
-    /* ── DIVIDER ── */
-    hr { border-color: #e8eaf0 !important; margin: 16px 0 !important; }
-
-    /* ── CUSTOM CARDS ── */
+    /* Custom cards */
     .warning-box {
-        background-color: #fffbeb;
-        border-left: 5px solid #f59e0b;
-        padding: 12px 18px; border-radius: 8px;
-        color: #92400e; font-weight: 500; margin-top: 8px;
-        font-family: 'Inter', sans-serif;
+        background-color: #fffbeb; border-left: 5px solid #f59e0b;
+        padding: 10px 16px; border-radius: 8px; color: #92400e;
+        font-weight: 500; margin-top: 8px;
     }
     .nse-link-box {
-        background-color: #eff6ff;
-        border-left: 5px solid #3b82f6;
-        padding: 12px 18px; border-radius: 8px;
-        color: #1e40af; font-size: 14px; margin-top: 6px;
-        font-family: 'Inter', sans-serif;
+        background-color: #eff6ff; border-left: 5px solid #3b82f6;
+        padding: 10px 16px; border-radius: 8px; color: #1e40af;
+        font-size: 14px; margin-top: 6px;
     }
-    .nse-link-box a { color: #2563eb !important; font-weight: 600 !important; }
+    .nse-link-box a { color: #2563eb !important; font-weight: 600; }
     .opp-card-green {
         background: linear-gradient(135deg, #f0fdf4, #dcfce7);
         border-left: 6px solid #16a34a; border-radius: 12px;
-        padding: 16px 20px; margin-bottom: 12px;
-        box-shadow: 0 2px 10px rgba(22,163,74,0.12);
-        font-family: 'Inter', sans-serif;
+        padding: 14px 18px; margin-bottom: 10px;
+        box-shadow: 0 2px 8px rgba(22,163,74,0.1);
     }
     .opp-card-red {
         background: linear-gradient(135deg, #fff1f2, #ffe4e6);
         border-left: 6px solid #dc2626; border-radius: 12px;
-        padding: 16px 20px; margin-bottom: 12px;
-        box-shadow: 0 2px 10px rgba(220,38,38,0.10);
-        font-family: 'Inter', sans-serif;
+        padding: 14px 18px; margin-bottom: 10px;
+        box-shadow: 0 2px 8px rgba(220,38,38,0.08);
     }
     .opp-card-grey {
-        background: #f8f9fa; border-left: 6px solid #9ca3af;
-        border-radius: 12px; padding: 16px 20px; margin-bottom: 12px;
-        font-family: 'Inter', sans-serif;
+        background: #f9fafb; border-left: 6px solid #9ca3af;
+        border-radius: 12px; padding: 14px 18px; margin-bottom: 10px;
     }
     .scanner-badge {
-        display: inline-block; padding: 3px 12px; border-radius: 20px;
+        display: inline-block; padding: 3px 10px; border-radius: 20px;
         font-size: 11px; font-weight: 700; margin-right: 6px;
-        font-family: 'Inter', sans-serif; letter-spacing: 0.03em;
     }
 
-    /* ── ALERT ANIMATIONS ── */
-    @keyframes pulse-green {
-        0%,100% { box-shadow: 0 0 0 0 rgba(22,163,74,0.4); }
-        50%      { box-shadow: 0 0 0 10px rgba(22,163,74,0); }
+    /* Buttons */
+    .stButton > button {
+        background-color: #1e3a5f !important; color: #ffffff !important;
+        font-weight: 700 !important; border: none !important;
+        border-radius: 8px !important; padding: 8px 20px !important;
     }
-    @keyframes pulse-red {
-        0%,100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.4); }
-        50%      { box-shadow: 0 0 0 10px rgba(220,38,38,0); }
+    .stButton > button:hover {
+        background-color: #2d5282 !important;
+        box-shadow: 0 4px 12px rgba(30,58,95,0.3) !important;
     }
-    .signal-pulse-green { animation: pulse-green 2s infinite; border-radius: 12px; }
-    .signal-pulse-red   { animation: pulse-red   2s infinite; border-radius: 12px; }
 
-    /* ── MULTISELECT TAGS ── */
+    /* Multiselect tags */
     span[data-baseweb="tag"] {
-        background-color: #1a1a2e !important;
-        border-radius: 20px !important;
+        background-color: #1e3a5f !important; border-radius: 20px !important;
     }
     span[data-baseweb="tag"] span { color: #ffffff !important; font-weight: 600 !important; }
 
-    /* ── INFO / SUCCESS / WARNING BOXES ── */
-    .stInfo    { background-color: #eff6ff !important; border-color: #3b82f6 !important;
-                 border-radius: 10px !important; color: #1e40af !important; }
-    .stSuccess { background-color: #f0fdf4 !important; border-color: #16a34a !important;
-                 border-radius: 10px !important; }
-    .stWarning { background-color: #fffbeb !important; border-color: #f59e0b !important;
-                 border-radius: 10px !important; }
-    .stError   { background-color: #fff1f2 !important; border-color: #dc2626 !important;
-                 border-radius: 10px !important; }
+    /* Expander */
+    .streamlit-expanderHeader {
+        background-color: #ffffff !important; border-radius: 8px !important;
+        font-weight: 600 !important; color: #1e3a5f !important;
+        border: 1px solid #e5e7eb !important;
+    }
+    .streamlit-expanderContent {
+        background-color: #ffffff !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 0 0 8px 8px !important;
+    }
+
+    /* Animations */
+    @keyframes pulse-green {
+        0%,100% { box-shadow: 0 0 0 0 rgba(22,163,74,0.4); }
+        50%      { box-shadow: 0 0 0 8px rgba(22,163,74,0); }
+    }
+    @keyframes pulse-red {
+        0%,100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.4); }
+        50%      { box-shadow: 0 0 0 8px rgba(220,38,38,0); }
+    }
+    .signal-pulse-green { animation: pulse-green 2s infinite; border-radius: 12px; }
+    .signal-pulse-red   { animation: pulse-red   2s infinite; border-radius: 12px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -312,9 +178,9 @@ st.markdown("""
 <div style="display:flex; align-items:center; gap:16px; margin-bottom:4px;">
   <span style="font-size:2rem;">🏛️</span>
   <div>
-    <h1 style="margin:0; font-size:1.9rem; font-weight:900; color:#1a1a2e;
+    <h1 style="margin:0; font-size:1.8rem; font-weight:800; color:#1e3a5f;
                letter-spacing:-0.02em;">Cross-Asset Arbitrage Opportunity Monitor</h1>
-    <p style="margin:0; font-size:13px; color:#6c757d;">
+    <p style="margin:0; font-size:13px; color:#64748b;">
       IIT Roorkee &nbsp;·&nbsp; Department of Management Studies &nbsp;·&nbsp;
       Financial Engineering Project &nbsp;·&nbsp; Developed by: <b style="color:#495057;">Group 4</b>
     </p>
@@ -364,29 +230,29 @@ with st.spinner(""):
     ticker_data = get_ticker_bar_data()
 
 now_str = datetime.datetime.now().strftime("%H:%M:%S")
-ticker_html = '''<div style="background:#1a1a2e;
-    border-radius:12px; padding:12px 24px;
+ticker_html = '''<div style="background:#1e3a5f;
+    border-radius:10px; padding:10px 20px;
     margin-bottom:16px; display:flex; gap:0; flex-wrap:wrap; align-items:center;
-    box-shadow: 0 4px 14px rgba(26,26,46,0.18);">
-    <span style="font-size:10px;color:#9ca3af;font-weight:700;
-          margin-right:24px;letter-spacing:0.12em;font-family:Inter,sans-serif;">● LIVE MARKET</span>'''
+    box-shadow: 0 2px 8px rgba(30,58,95,0.2);">
+    <span style="font-size:11px;color:#93c5fd;font-weight:700;
+          margin-right:20px;letter-spacing:0.1em;">● LIVE MARKET</span>'''
 
 for asset_name, d in ticker_data.items():
     color  = "#22c55e" if d["chg"] >= 0 else "#ef4444"
     arrow  = "▲" if d["chg"] >= 0 else "▼"
     prefix = "₹" if asset_name != "USD/INR" else ""
     ticker_html += (
-        '<span style="font-size:13px;font-weight:700;color:#f1f5f9;'
-        'margin-right:28px;display:inline-flex;align-items:center;gap:6px;font-family:Inter,sans-serif;">'
-        '<span style="color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:0.05em;">{n}&nbsp;</span>'
+        '<span style="font-size:13px;font-weight:700;color:#ffffff;'
+        'margin-right:24px;display:inline-flex;align-items:center;gap:5px;">'
+        '<span style="color:#93c5fd;font-size:11px;font-weight:700;">{n} </span>'
         '{p}{v:,.2f}'
-        '<span style="color:{c};font-size:11px;font-weight:600;font-family:Inter,sans-serif;">&nbsp;{a}{p2}{chg:.2f} ({pct:.2f}%)</span>'
+        '<span style="color:{c};font-size:12px;font-weight:600;"> {a}{p2}{chg:.2f} ({pct:.2f}%)</span>'
         '</span>'.format(
             n=asset_name, p=prefix, v=d["price"],
             c=color, a=arrow, p2=prefix, chg=abs(d["chg"]), pct=abs(d["chg_pct"]))
     )
 
-ticker_html += '<span style="margin-left:auto;font-size:10px;color:#64748b;font-family:Inter,sans-serif;">🕐 {t}</span></div>'.format(t=now_str)
+ticker_html += '<span style="margin-left:auto;font-size:11px;color:#93c5fd;">Updated: {t}</span></div>'.format(t=now_str)
 st.markdown(ticker_html, unsafe_allow_html=True)
 
 
@@ -833,7 +699,7 @@ with tab0:
                             overlaying="y", side="right", tickformat=".1f"),
                 height=380, margin=dict(t=45, b=40, l=10, r=10),
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                plot_bgcolor="#ffffff", paper_bgcolor="#f4f6f9", barmode="group")
+                plot_bgcolor="#f8f9fa", paper_bgcolor="white", barmode="group")
             st.plotly_chart(fig_scan, use_container_width=True)
 
         # ── Exportable summary table ───────────────────────────────────────
@@ -1142,7 +1008,7 @@ with tab1:
                         range=[-net_pad, net_pad], showgrid=True, gridcolor="#e9ecef"),
             height=370, margin=dict(t=45, b=40, l=10, r=10),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            hovermode="x unified", plot_bgcolor="#ffffff", paper_bgcolor="#f4f6f9")
+            hovermode="x unified", plot_bgcolor="#f8f9fa", paper_bgcolor="white")
         st.plotly_chart(fig, use_container_width=True)
         st.caption("📌 Dotted = individual legs (left axis). Solid = Net P&L after costs (right axis). The flat line proves the arbitrage is locked.")
 
@@ -1315,7 +1181,7 @@ with tab2:
         xaxis=dict(title="Market Forward Rate (USD/INR)", tickformat=".4f"),
         yaxis=dict(title="Net Profit (₹)", tickformat=",.0f"),
         height=320, margin=dict(t=40,b=30,l=10,r=10),
-        plot_bgcolor="#ffffff", paper_bgcolor="#f4f6f9", showlegend=False)
+        plot_bgcolor="#f8f9fa", paper_bgcolor="white", showlegend=False)
     st.plotly_chart(fig_irp, use_container_width=True)
     st.caption("Green = Theoretical forward (no-arbitrage). Red = current market forward. Width of gap = arbitrage opportunity size.")
 
@@ -1486,7 +1352,7 @@ with tab3:
                     overlaying="y", side="right", tickformat=",.2f"),
         height=320, margin=dict(t=40,b=30,l=10,r=10),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        plot_bgcolor="#ffffff", paper_bgcolor="#f4f6f9")
+        plot_bgcolor="#f8f9fa", paper_bgcolor="white")
     st.plotly_chart(fig_fb, use_container_width=True)
     st.caption("As time passes, F* rises (cost of carry accumulates) and converges to F_mkt at expiry. "
                "The basis (orange dotted) decays to zero — this convergence locks in the arbitrage profit.")
