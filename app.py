@@ -11,78 +11,66 @@ st.set_page_config(page_title="Cross-Asset Arbitrage Monitor", layout="wide", pa
 
 st.markdown("""
     <style>
+    /* ── GLOBAL THEME ── */
+    [data-testid="stAppViewContainer"] {
+        background-color: #0d1117; /* True dark matte */
+    }
+    
     /* ── METRIC CARDS ── */
     div[data-testid="stMetric"] {
-        background: #1a2332 !important; border-radius:10px !important;
-        padding:14px 18px !important; border:1px solid #2d4a6b !important;
+        background: #161b22 !important; 
+        border-radius: 8px !important;
+        padding: 15px !important; 
+        border: 1px solid #30363d !important; /* Subtle divider style */
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     div[data-testid="stMetricLabel"] p {
-        color:#7fb3d3 !important; font-size:11px !important;
-        font-weight:700 !important; text-transform:uppercase; letter-spacing:0.08em;
+        color: #8b949e !important; 
+        font-size: 12px !important;
+        font-weight: 600 !important; 
+        text-transform: uppercase; 
+        letter-spacing: 0.05em;
     }
     div[data-testid="stMetricValue"] {
-        color:#ffffff !important; font-size:26px !important; font-weight:800 !important;
+        color: #f0f6fc !important; 
+        font-size: 24px !important; 
+        font-weight: 700 !important;
     }
-    /* ── TABS ── */
+
+    /* ── TABS (Modern Pill Style) ── */
     .stTabs [data-baseweb="tab-list"] {
-        background-color:#1a2332 !important; border-radius:10px !important;
-        padding:4px !important; border:1px solid #2d4a6b !important;
+        gap: 8px;
+        background-color: transparent !important;
     }
     .stTabs [data-baseweb="tab"] {
-        border-radius:7px !important; font-weight:600 !important;
-        font-size:13px !important; color:#7fb3d3 !important; padding:8px 16px !important;
+        background-color: #161b22 !important;
+        border-radius: 6px 6px 0 0 !important;
+        border: 1px solid #30363d !important;
+        border-bottom: none !important;
+        padding: 8px 16px !important;
+        color: #8b949e !important;
     }
     .stTabs [aria-selected="true"] {
-        background-color:#2563eb !important; color:#ffffff !important;
+        background-color: #1f6feb !important; /* Standard "Financial Blue" */
+        color: white !important;
+        border-color: #1f6feb !important;
     }
+
     /* ── SIDEBAR ── */
     section[data-testid="stSidebar"] {
-        background-color:#0d1421 !important; border-right:1px solid #1e3a5f !important;
+        background-color: #0d1117 !important;
+        border-right: 1px solid #30363d !important;
     }
+
     /* ── BUTTONS ── */
     .stButton > button {
-        background-color:#2563eb !important; color:#ffffff !important;
-        font-weight:700 !important; border:none !important;
-        border-radius:8px !important; padding:10px 24px !important; font-size:14px !important;
+        background-color: #238636 !important; /* Success Green */
+        color: white !important;
+        border-radius: 6px !important;
+        border: none !important;
+        font-weight: 600 !important;
+        width: 100%;
     }
-    .stButton > button:hover { background-color:#1d4ed8 !important; }
-    /* ── MULTISELECT TAGS ── */
-    span[data-baseweb="tag"] { background-color:#2563eb !important; border-radius:20px !important; }
-    span[data-baseweb="tag"] span { color:#ffffff !important; font-weight:600 !important; }
-    /* ── DATAFRAME ── */
-    .stDataFrame thead th {
-        background-color:#1a2332 !important; color:#7fb3d3 !important;
-        font-weight:700 !important; font-size:12px !important;
-    }
-    /* ── EXPANDER ── */
-    .streamlit-expanderHeader {
-        background-color:#1a2332 !important; color:#e2e8f0 !important;
-        font-weight:600 !important; border-radius:8px !important; border:1px solid #2d4a6b !important;
-    }
-    .streamlit-expanderContent {
-        background-color:#131c2b !important; border:1px solid #2d4a6b !important;
-    }
-    /* ── CUSTOM BOXES ── */
-    .warning-box {
-        background-color:#2d1a00; border-left:4px solid #f59e0b;
-        padding:10px 14px; border-radius:6px; color:#fbbf24; font-size:13px;
-    }
-    .nse-link-box {
-        background-color:#0d1e35; border-left:4px solid #3b82f6;
-        padding:10px 14px; border-radius:6px; color:#93c5fd; font-size:13px;
-    }
-    .nse-link-box a { color:#60a5fa !important; font-weight:600; }
-    /* ── SCANNER BADGES ── */
-    .scanner-badge {
-        display:inline-block; padding:3px 10px; border-radius:20px;
-        font-size:11px; font-weight:700; margin-right:5px;
-    }
-    /* ── ANIMATIONS ── */
-    @keyframes pulse-green {
-        0%,100% { box-shadow:0 0 0 0 rgba(34,197,94,0.5); }
-        50%      { box-shadow:0 0 0 10px rgba(34,197,94,0); }
-    }
-    .signal-pulse-green { animation:pulse-green 2s infinite; border-radius:10px; }
     </style>
 """, unsafe_allow_html=True)
 
