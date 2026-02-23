@@ -1381,6 +1381,13 @@ with tab1:
     st.divider()
     st.subheader("📉 Expiry Scenario Analysis")
     st.caption("Net P&L is identical across all expiry prices — proving the payoff is fully locked at entry.")
+
+    # ── Lot size info bar ─────────────────────────────────────────────────────
+    la, lb, lc, ld = st.columns(4)
+    la.metric("Asset",      asset)
+    lb.metric("Lot Size",   "{} units".format(LOT_SIZES[asset]))
+    lc.metric("Lots",       "{} lot{}".format(num_lots, "s" if num_lots > 1 else ""))
+    ld.metric("Total Units","{:,}".format(total_units))
     scenarios = {"Bear (−15%)": s0*0.85, "Bear (−10%)": s0*0.90, "At Strike": strike,
                  "At Money": s0, "Bull (+10%)": s0*1.10, "Bull (+15%)": s0*1.15}
     rows = []
