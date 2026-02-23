@@ -471,23 +471,41 @@ NSE_CHAIN_URLS = {
 # ── FEATURE 1: LIVE MARKET STATUS TICKER BAR ─────────────────────────────────
 @st.cache_data(ttl=120, show_spinner=False)
 def get_ticker_bar_data():
-    """Fetch all 5 asset spots + USD/INR for the header bar."""
+    """Fetch all 5 asset spots + USD/INR — tries fast_info (live intraday) first,
+    falls back to history(period='5d') close if fast_info is unavailable."""
     results = {}
     for name, ticker in TICKER_MAP.items():
         try:
-            h = yf.Ticker(ticker).history(period="2d")
-            if not h.empty:
+            t = yf.Ticker(ticker)
+            # fast_info gives live intraday last price during market hours
+            fi = t.fast_info
+            live_price = getattr(fi, "last_price", None) or getattr(fi, "regularMarketPrice", None)
+            if live_price and float(live_price) > 0:
+                price = float(live_price)
+                prev  = getattr(fi, "previous_close", None) or float(price)
+                prev  = float(prev) if prev else price
+            else:
+                # fallback: last two closes
+                h = t.history(period="5d")
+                if h.empty:
+                    raise ValueError("empty history")
                 price = float(h["Close"].iloc[-1])
                 prev  = float(h["Close"].iloc[-2]) if len(h) > 1 else price
-                results[name] = {"price": price, "chg": price - prev, "chg_pct": (price-prev)/prev*100}
+            results[name] = {"price": price, "chg": price - prev, "chg_pct": (price - prev) / prev * 100}
         except Exception:
             results[name] = {"price": FALLBACK_SPOTS[name], "chg": 0, "chg_pct": 0}
     try:
-        fx = yf.Ticker("USDINR=X").history(period="2d")
-        if not fx.empty:
-            p = float(fx["Close"].iloc[-1])
-            prev = float(fx["Close"].iloc[-2]) if len(fx) > 1 else p
-            results["USD/INR"] = {"price": p, "chg": p-prev, "chg_pct": (p-prev)/prev*100}
+        t = yf.Ticker("USDINR=X")
+        fi = t.fast_info
+        live_price = getattr(fi, "last_price", None) or getattr(fi, "regularMarketPrice", None)
+        if live_price and float(live_price) > 0:
+            price = float(live_price)
+            prev  = float(getattr(fi, "previous_close", None) or price)
+        else:
+            h = t.history(period="5d")
+            price = float(h["Close"].iloc[-1]) if not h.empty else 83.50
+            prev  = float(h["Close"].iloc[-2]) if len(h) > 1 else price
+        results["USD/INR"] = {"price": price, "chg": price - prev, "chg_pct": (price - prev) / prev * 100}
     except Exception:
         results["USD/INR"] = {"price": 83.50, "chg": 0, "chg_pct": 0}
     return results
@@ -583,10 +601,22 @@ def get_market_data(asset_name):
         spot, calls_df, puts_df, expiry, expiries = result
         return spot, calls_df, puts_df, expiry, expiries, None, "nse"
     try:
-        stock = yf.Ticker(TICKER_MAP[asset_name])
-        hist  = stock.history(period="2d")
-        if not hist.empty:
-            spot = float(round(hist["Close"].iloc[-1], 2))
+        stock  = yf.Ticker(TICKER_MAP[asset_name])
+        spot   = None
+        # Try fast_info first for live intraday price
+        try:
+            fi   = stock.fast_info
+            live = getattr(fi, "last_price", None) or getattr(fi, "regularMarketPrice", None)
+            if live and float(live) > 0:
+                spot = float(round(live, 2))
+        except Exception:
+            pass
+        # Fallback to history close
+        if not spot:
+            hist = stock.history(period="5d")
+            if not hist.empty:
+                spot = float(round(hist["Close"].iloc[-1], 2))
+        if spot:
             return spot, pd.DataFrame(), pd.DataFrame(), None, [], \
                 "NSE option chain unavailable from cloud server. Live spot ✅ | Enter prices manually.", "yf_spot"
     except Exception:
@@ -1021,6 +1051,7 @@ with tab0:
             "Rank":       i+1,
             "Strategy":   o["strategy"],
             "Asset":      o["asset"],
+            "Lot Size":   LOT_SIZES.get(o["asset"], "—"),
             "Type":       o["type"],
             "Spot":       "₹{:,.2f}".format(o["spot"]) if o["asset"] != "USD/INR" else "{:.4f}".format(o["spot"]),
             "Gap":        "{:.4f}".format(o["gap"]),
@@ -1168,13 +1199,20 @@ with tab1:
         strike = st.number_input("Strike Price (₹)", value=default_strike, step=step, format="%.2f", key="pcp_strike_{}".format(asset))
     with p2:
         live_call    = lookup_option_price(calls_df, strike)
-        call_default = live_call if live_call is not None else round(s0 * 0.025, 2)
+        # Realistic ATM IV-based fallback defaults per asset
+        # NIFTY IV ~12-14%  → ATM ≈ 0.55% of spot for ~30 days
+        # Stocks  IV ~20-28% → ATM ≈ 0.90-1.10% of spot for ~30 days
+        CALL_PCT = {"NIFTY": 0.0055, "RELIANCE": 0.0100, "TCS": 0.0095,
+                    "SBIN": 0.0105, "INFY": 0.0100}
+        PUT_PCT  = {"NIFTY": 0.0050, "RELIANCE": 0.0090, "TCS": 0.0085,
+                    "SBIN": 0.0095, "INFY": 0.0090}
+        call_default = live_call if live_call is not None else round(s0 * CALL_PCT.get(asset, 0.009), 2)
         call_src     = "🟢 Live" if live_call is not None else "🟡 Enter manually"
         c_mkt = st.number_input("Call Price (₹)  {}".format(call_src),
                                 value=float(call_default), min_value=0.01, step=0.5, format="%.2f", key="pcp_call_{}".format(asset))
     with p3:
         live_put    = lookup_option_price(puts_df, strike)
-        put_default = live_put if live_put is not None else round(s0 * 0.018, 2)
+        put_default = live_put if live_put is not None else round(s0 * PUT_PCT.get(asset, 0.008), 2)
         put_src     = "🟢 Live" if live_put is not None else "🟡 Enter manually"
         p_mkt = st.number_input("Put Price (₹)  {}".format(put_src),
                                 value=float(put_default), min_value=0.01, step=0.5, format="%.2f", key="pcp_put_{}".format(asset))
