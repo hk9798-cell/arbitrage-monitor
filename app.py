@@ -1985,7 +1985,7 @@ the dashboard calculates the arbitrage profit and provides step-by-step executio
 
 **Course:** Financial Engineering
 
-**Team:** Group 4
+**Team:** Group 5
 
 **Supervisor:** Financial Engineering Faculty
 
