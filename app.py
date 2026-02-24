@@ -437,7 +437,7 @@ st.markdown("""
         letter-spacing: 0.04em;
         font-family: DM Sans, system-ui, sans-serif;
     ">IIT Roorkee &nbsp;·&nbsp; Dept. of Management Studies &nbsp;·&nbsp; Financial Engineering &nbsp;·&nbsp;
-    <span style="color:#7a6230; font-weight: 600;">Group 4</span></div>
+    <span style="color:#7a6230; font-weight: 600;">Anchal Verma Group</span></div>
   </div>
   <div style="
       padding: 5px 12px;
@@ -721,8 +721,13 @@ with tab0:
     today_sc = datetime.date.today()
 
     def next_tuesday_expiry(from_date):
-        """Next weekly Tuesday expiry (NSE weekly options expire on Tuesday)"""
-        days_ahead = 1 - from_date.weekday()  # Tuesday = weekday 1
+        """Next weekly Tuesday expiry — includes today if Tuesday before 3:30 PM IST"""
+        now_ist = datetime.datetime.utcnow().replace(tzinfo=None) + datetime.timedelta(hours=5, minutes=30)
+        is_tuesday = from_date.weekday() == 1
+        before_cutoff = now_ist.hour < 15 or (now_ist.hour == 15 and now_ist.minute < 30)
+        if is_tuesday and before_cutoff:
+            return from_date   # today is valid expiry
+        days_ahead = 1 - from_date.weekday()
         if days_ahead <= 0:
             days_ahead += 7
         return from_date + datetime.timedelta(days=days_ahead)
@@ -1099,17 +1104,23 @@ with tab1:
         today = datetime.date.today()
         # NSE weekly expiries — every Tuesday
         def next_weekly_tuesdays(from_date, count=6):
-            """Return next N weekly Tuesday expiry dates"""
+            """Return next N Tuesday expiries — includes today if Tuesday before 3:30 PM IST"""
+            now_ist = datetime.datetime.utcnow().replace(tzinfo=None) + datetime.timedelta(hours=5, minutes=30)
             tuesdays = []
+            # Include today if it's Tuesday and before expiry cutoff (3:30 PM IST)
+            is_tuesday_today = from_date.weekday() == 1
+            before_cutoff = now_ist.hour < 15 or (now_ist.hour == 15 and now_ist.minute < 30)
+            if is_tuesday_today and before_cutoff:
+                tuesdays.append(from_date)
             d = from_date
             while len(tuesdays) < count:
-                days_ahead = 1 - d.weekday()  # Tuesday = 1
+                days_ahead = 1 - d.weekday()
                 if days_ahead <= 0:
                     days_ahead += 7
                 d = d + datetime.timedelta(days=days_ahead)
                 tuesdays.append(d)
                 d = d + datetime.timedelta(days=1)
-            return tuesdays
+            return tuesdays[:count]
 
         # Build next 6 weekly Tuesday expiries
         suggested_expiries = next_weekly_tuesdays(today, count=6)
@@ -1189,23 +1200,40 @@ with tab1:
         strike = st.number_input("Strike Price (₹)", value=default_strike, step=step, format="%.2f", key="pcp_strike_{}".format(asset))
     with p2:
         live_call    = lookup_option_price(calls_df, strike)
-        # Realistic ATM IV-based fallback defaults per asset
-        # NIFTY IV ~12-14%  → ATM ≈ 0.55% of spot for ~30 days
-        # Stocks  IV ~20-28% → ATM ≈ 0.90-1.10% of spot for ~30 days
-        CALL_PCT = {"NIFTY": 0.0055, "RELIANCE": 0.0100, "TCS": 0.0095,
-                    "SBIN": 0.0105, "INFY": 0.0100}
-        PUT_PCT  = {"NIFTY": 0.0050, "RELIANCE": 0.0090, "TCS": 0.0085,
-                    "SBIN": 0.0095, "INFY": 0.0090}
-        call_default = live_call if live_call is not None else round(s0 * CALL_PCT.get(asset, 0.009), 2)
-        call_src     = "🟢 Live" if live_call is not None else "🟡 Enter manually"
+        # Black-Scholes based ATM option price defaults — changes with expiry & spot
+        def bs_atm_price(S, K, T_days, sigma):
+            """Calculate ATM Call & Put using Black-Scholes"""
+            import math
+            T = max(T_days, 0.5) / 365.0
+            r_bs = 0.0675
+            try:
+                d1 = (math.log(S/K) + (r_bs + 0.5*sigma**2)*T) / (sigma*math.sqrt(T))
+                d2 = d1 - sigma*math.sqrt(T)
+                # Cumulative normal distribution approximation
+                def N(x):
+                    return 0.5*(1+math.erf(x/math.sqrt(2)))
+                call = S*N(d1) - K*math.exp(-r_bs*T)*N(d2)
+                put  = K*math.exp(-r_bs*T)*N(-d2) - S*N(-d1)
+                return round(max(call,0.01),2), round(max(put,0.01),2)
+            except Exception:
+                return round(S*0.006,2), round(S*0.005,2)
+
+        ASSET_IV = {"NIFTY": 0.13, "RELIANCE": 0.22, "TCS": 0.20,
+                    "SBIN": 0.28, "INFY": 0.24}
+        bs_call, bs_put = bs_atm_price(s0, strike, days_to_expiry, ASSET_IV.get(asset, 0.20))
+        call_default = live_call if live_call is not None else bs_call
+        call_src     = "🟢 Live" if live_call is not None else "🟡 Enter manually (BS estimate)"
+        # Key includes strike + days so widget refreshes when either changes
         c_mkt = st.number_input("Call Price (₹)  {}".format(call_src),
-                                value=float(call_default), min_value=0.01, step=0.5, format="%.2f", key="pcp_call_{}".format(asset))
+                                value=float(call_default), min_value=0.01, step=0.5, format="%.2f",
+                                key="pcp_call_{}_{}_{}" .format(asset, int(strike), days_to_expiry))
     with p3:
         live_put    = lookup_option_price(puts_df, strike)
-        put_default = live_put if live_put is not None else round(s0 * PUT_PCT.get(asset, 0.008), 2)
+        put_default = live_put if live_put is not None else bs_put
         put_src     = "🟢 Live" if live_put is not None else "🟡 Enter manually"
         p_mkt = st.number_input("Put Price (₹)  {}".format(put_src),
-                                value=float(put_default), min_value=0.01, step=0.5, format="%.2f", key="pcp_put_{}".format(asset))
+                                value=float(put_default), min_value=0.01, step=0.5, format="%.2f",
+                                key="pcp_put_{}_{}_{}" .format(asset, int(strike), days_to_expiry))
 
     # ── CALCULATIONS ──────────────────────────────────────────────────────────
     pv_k            = strike * np.exp(-r_rate * t)
@@ -1985,7 +2013,7 @@ the dashboard calculates the arbitrage profit and provides step-by-step executio
 
 **Course:** Financial Engineering
 
-**Team:** Group 4
+**Team:** Anchal Verma Group
 
 **Supervisor:** Financial Engineering Faculty
 
