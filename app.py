@@ -1861,10 +1861,13 @@ with tab4:
                                        help="Used to calculate Capital Required in PCP tab")
 
         st.markdown("**🚨 Alert Threshold**")
-        new_alert_thr     = st.number_input("Minimum Net P&L to trigger TRADE NOW banner (₹)",
-                                             value=float(st.session_state.get("alert_threshold", 500)),
-                                             min_value=0.0, step=100.0, key="cfg_alert",
-                                             help="Shows a flashing alert banner when Net P&L exceeds this value")
+        if "alert_threshold" not in st.session_state:
+            st.session_state["alert_threshold"] = 500.0
+        new_alert_thr = st.number_input("Minimum Net P&L to trigger TRADE NOW banner (₹)",
+                                        value=float(st.session_state["alert_threshold"]),
+                                        min_value=0.0, step=100.0,
+                                        help="Shows a flashing alert banner when Net P&L exceeds this value",
+                                        key="cfg_alert_input")
 
     st.divider()
 
@@ -1888,6 +1891,7 @@ with tab4:
             st.session_state.show_metadata     = new_show_metadata
             st.session_state.margin_pct        = new_margin_pct
             st.session_state.alert_threshold   = new_alert_thr
+            st.session_state["alert_threshold"] = new_alert_thr
             st.success("✅ Settings saved! All tabs will use updated values.")
 
     with reset_col:
