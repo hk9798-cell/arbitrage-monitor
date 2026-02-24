@@ -1607,9 +1607,13 @@ with tab3:
                                      help="Annual storage or holding cost. Negative = dividend yield (reduces fair futures price)",
                                      key="fb_hold")
     with fb_c2:
+        def _next_tuesday(d):
+            days_ahead = 1 - d.weekday()
+            if days_ahead <= 0:
+                days_ahead += 7
+            return d + datetime.timedelta(days=days_ahead)
         fb_expiry  = st.date_input("Futures Expiry Date",
-                                   value=last_thursday(today.year, today.month) if last_thursday(today.year, today.month) > today
-                                   else last_thursday(today.year, today.month + 1 if today.month < 12 else 1),
+                                   value=_next_tuesday(today),
                                    min_value=today + datetime.timedelta(days=1),
                                    max_value=today + datetime.timedelta(days=365),
                                    key="fb_expiry")
