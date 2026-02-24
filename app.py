@@ -1137,10 +1137,12 @@ with tab1:
                     pass
 
         default_expiry = parsed_nse_expiry if parsed_nse_expiry else (suggested_expiries[0] if suggested_expiries else today + datetime.timedelta(days=30))
+        # min_value = today if today is Tuesday (valid expiry), else tomorrow
+        min_expiry = today if today.weekday() == 1 else today + datetime.timedelta(days=1)
         expiry_date = st.date_input(
             "Expiry Date",
             value=default_expiry,
-            min_value=today + datetime.timedelta(days=1),
+            min_value=min_expiry,
             max_value=today + datetime.timedelta(days=365),
             help="Select the actual NSE expiry date for this contract",
             key="pcp_expiry"
@@ -1481,7 +1483,7 @@ with tab2:
     with irp_c3:
         irp_expiry = st.date_input("Forward Contract Maturity",
                                    value=today + datetime.timedelta(days=90),
-                                   min_value=today + datetime.timedelta(days=1),
+                                   min_value=today if today.weekday() == 1 else today + datetime.timedelta(days=1),
                                    max_value=today + datetime.timedelta(days=730),
                                    key="irp_expiry")
         irp_days   = (irp_expiry - today).days
@@ -1642,7 +1644,7 @@ with tab3:
             return d + datetime.timedelta(days=days_ahead)
         fb_expiry  = st.date_input("Futures Expiry Date",
                                    value=_next_tuesday(today),
-                                   min_value=today + datetime.timedelta(days=1),
+                                   min_value=today if today.weekday() == 1 else today + datetime.timedelta(days=1),
                                    max_value=today + datetime.timedelta(days=365),
                                    key="fb_expiry")
         fb_days    = (fb_expiry - today).days
