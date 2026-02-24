@@ -437,7 +437,7 @@ st.markdown("""
         letter-spacing: 0.04em;
         font-family: DM Sans, system-ui, sans-serif;
     ">IIT Roorkee &nbsp;·&nbsp; Dept. of Management Studies &nbsp;·&nbsp; Financial Engineering &nbsp;·&nbsp;
-    <span style="color:#7a6230; font-weight: 600;">Group 4</span></div>
+    <span style="color:#7a6230; font-weight: 600;">Anchal Verma Group</span></div>
   </div>
   <div style="
       padding: 5px 12px;
@@ -1985,7 +1985,7 @@ the dashboard calculates the arbitrage profit and provides step-by-step executio
 
 **Course:** Financial Engineering
 
-**Team:** Group 4
+**Team:** Anchal Verma Group
 
 **Supervisor:** Financial Engineering Faculty
 
