@@ -437,7 +437,7 @@ st.markdown("""
         letter-spacing: 0.04em;
         font-family: DM Sans, system-ui, sans-serif;
     ">IIT Roorkee &nbsp;·&nbsp; Dept. of Management Studies &nbsp;·&nbsp; Financial Engineering &nbsp;·&nbsp;
-    <span style="color:#7a6230; font-weight: 600;">Anchal Verma Group</span></div>
+    <span style="color:#7a6230; font-weight: 600;">Group 4</span></div>
   </div>
   <div style="
       padding: 5px 12px;
@@ -626,14 +626,10 @@ def get_market_data(asset_name):
 
 @st.cache_data(ttl=300, show_spinner=False)
 def get_forex_rate():
-    """Fetch USD/INR spot rate — tries fast_info first for live price."""
+    """Fetch USD/INR spot rate via yfinance."""
     try:
-        t  = yf.Ticker("USDINR=X")
-        fi = t.fast_info
-        live = getattr(fi, "last_price", None) or getattr(fi, "regularMarketPrice", None)
-        if live and float(live) > 0:
-            return float(round(live, 4))
-        h = t.history(period="5d")
+        t = yf.Ticker("USDINR=X")
+        h = t.history(period="2d")
         if not h.empty:
             return float(round(h["Close"].iloc[-1], 4))
     except Exception:
@@ -725,13 +721,8 @@ with tab0:
     today_sc = datetime.date.today()
 
     def next_tuesday_expiry(from_date):
-        """Next weekly Tuesday expiry — includes today if Tuesday before 3:30 PM IST"""
-        now_ist = datetime.datetime.utcnow().replace(tzinfo=None) + datetime.timedelta(hours=5, minutes=30)
-        is_tuesday = from_date.weekday() == 1
-        before_cutoff = now_ist.hour < 15 or (now_ist.hour == 15 and now_ist.minute < 30)
-        if is_tuesday and before_cutoff:
-            return from_date   # today is valid expiry
-        days_ahead = 1 - from_date.weekday()
+        """Next weekly Tuesday expiry (NSE weekly options expire on Tuesday)"""
+        days_ahead = 1 - from_date.weekday()  # Tuesday = weekday 1
         if days_ahead <= 0:
             days_ahead += 7
         return from_date + datetime.timedelta(days=days_ahead)
@@ -1108,23 +1099,17 @@ with tab1:
         today = datetime.date.today()
         # NSE weekly expiries — every Tuesday
         def next_weekly_tuesdays(from_date, count=6):
-            """Return next N Tuesday expiries — includes today if Tuesday before 3:30 PM IST"""
-            now_ist = datetime.datetime.utcnow().replace(tzinfo=None) + datetime.timedelta(hours=5, minutes=30)
+            """Return next N weekly Tuesday expiry dates"""
             tuesdays = []
-            # Include today if it's Tuesday and before expiry cutoff (3:30 PM IST)
-            is_tuesday_today = from_date.weekday() == 1
-            before_cutoff = now_ist.hour < 15 or (now_ist.hour == 15 and now_ist.minute < 30)
-            if is_tuesday_today and before_cutoff:
-                tuesdays.append(from_date)
             d = from_date
             while len(tuesdays) < count:
-                days_ahead = 1 - d.weekday()
+                days_ahead = 1 - d.weekday()  # Tuesday = 1
                 if days_ahead <= 0:
                     days_ahead += 7
                 d = d + datetime.timedelta(days=days_ahead)
                 tuesdays.append(d)
                 d = d + datetime.timedelta(days=1)
-            return tuesdays[:count]
+            return tuesdays
 
         # Build next 6 weekly Tuesday expiries
         suggested_expiries = next_weekly_tuesdays(today, count=6)
@@ -1141,12 +1126,10 @@ with tab1:
                     pass
 
         default_expiry = parsed_nse_expiry if parsed_nse_expiry else (suggested_expiries[0] if suggested_expiries else today + datetime.timedelta(days=30))
-        # min_value = today if today is Tuesday (valid expiry), else tomorrow
-        min_expiry = today if today.weekday() == 1 else today + datetime.timedelta(days=1)
         expiry_date = st.date_input(
             "Expiry Date",
             value=default_expiry,
-            min_value=min_expiry,
+            min_value=today + datetime.timedelta(days=1),
             max_value=today + datetime.timedelta(days=365),
             help="Select the actual NSE expiry date for this contract",
             key="pcp_expiry"
@@ -1206,44 +1189,23 @@ with tab1:
         strike = st.number_input("Strike Price (₹)", value=default_strike, step=step, format="%.2f", key="pcp_strike_{}".format(asset))
     with p2:
         live_call    = lookup_option_price(calls_df, strike)
-        # Black-Scholes based option price defaults — updates with strike, expiry & spot
-        def bs_atm_price(S, K, T_days, sigma):
-            """Calculate Call & Put using Black-Scholes.
-            At T=0 (expiry day): returns intrinsic value only."""
-            import math
-            r_bs = 0.0675
-            # T=0: only intrinsic value remains
-            if T_days <= 0:
-                call = max(S - K, 0.01)
-                put  = max(K - S, 0.01)
-                return round(call, 2), round(put, 2)
-            T = T_days / 365.0
-            try:
-                d1 = (math.log(S/K) + (r_bs + 0.5*sigma**2)*T) / (sigma*math.sqrt(T))
-                d2 = d1 - sigma*math.sqrt(T)
-                def N(x): return 0.5*(1+math.erf(x/math.sqrt(2)))
-                call = S*N(d1) - K*math.exp(-r_bs*T)*N(d2)
-                put  = K*math.exp(-r_bs*T)*N(-d2) - S*N(-d1)
-                return round(max(call,0.01),2), round(max(put,0.01),2)
-            except Exception:
-                return round(max(S-K,0.01),2), round(max(K-S,0.01),2)
-
-        ASSET_IV = {"NIFTY": 0.13, "RELIANCE": 0.22, "TCS": 0.20,
-                    "SBIN": 0.28, "INFY": 0.24}
-        bs_call, bs_put = bs_atm_price(s0, strike, days_to_expiry, ASSET_IV.get(asset, 0.20))
-        call_default = live_call if live_call is not None else bs_call
-        call_src     = "🟢 Live" if live_call is not None else "🟡 Enter manually (BS estimate)"
-        # Key includes strike + days so widget refreshes when either changes
+        # Realistic ATM IV-based fallback defaults per asset
+        # NIFTY IV ~12-14%  → ATM ≈ 0.55% of spot for ~30 days
+        # Stocks  IV ~20-28% → ATM ≈ 0.90-1.10% of spot for ~30 days
+        CALL_PCT = {"NIFTY": 0.0055, "RELIANCE": 0.0100, "TCS": 0.0095,
+                    "SBIN": 0.0105, "INFY": 0.0100}
+        PUT_PCT  = {"NIFTY": 0.0050, "RELIANCE": 0.0090, "TCS": 0.0085,
+                    "SBIN": 0.0095, "INFY": 0.0090}
+        call_default = live_call if live_call is not None else round(s0 * CALL_PCT.get(asset, 0.009), 2)
+        call_src     = "🟢 Live" if live_call is not None else "🟡 Enter manually"
         c_mkt = st.number_input("Call Price (₹)  {}".format(call_src),
-                                value=float(call_default), min_value=0.01, step=0.5, format="%.2f",
-                                key="pcp_call_{}_{}_{}" .format(asset, int(strike), days_to_expiry))
+                                value=float(call_default), min_value=0.01, step=0.5, format="%.2f", key="pcp_call_{}".format(asset))
     with p3:
         live_put    = lookup_option_price(puts_df, strike)
-        put_default = live_put if live_put is not None else bs_put
+        put_default = live_put if live_put is not None else round(s0 * PUT_PCT.get(asset, 0.008), 2)
         put_src     = "🟢 Live" if live_put is not None else "🟡 Enter manually"
         p_mkt = st.number_input("Put Price (₹)  {}".format(put_src),
-                                value=float(put_default), min_value=0.01, step=0.5, format="%.2f",
-                                key="pcp_put_{}_{}_{}" .format(asset, int(strike), days_to_expiry))
+                                value=float(put_default), min_value=0.01, step=0.5, format="%.2f", key="pcp_put_{}".format(asset))
 
     # ── CALCULATIONS ──────────────────────────────────────────────────────────
     pv_k            = strike * np.exp(-r_rate * t)
@@ -1279,10 +1241,6 @@ with tab1:
     pnl_profitable = net_pnl > 0
 
     # ── METRICS ROW ───────────────────────────────────────────────────────────
-    # Warn user if today is expiry day
-    if days_to_expiry <= 0:
-        st.warning("⚠️ **Today is expiry day (T=0).** Option prices shown are intrinsic values only — no time premium remains. For meaningful arbitrage analysis, please select **next Tuesday's expiry** from the date picker above.")
-
     st.markdown("---")
     ann_return_pcp = (net_pnl / max(s0 * total_units, 1)) * (365 / max(days_to_expiry, 1)) * 100
 
@@ -1495,7 +1453,7 @@ with tab2:
     with irp_c3:
         irp_expiry = st.date_input("Forward Contract Maturity",
                                    value=today + datetime.timedelta(days=90),
-                                   min_value=today if today.weekday() == 1 else today + datetime.timedelta(days=1),
+                                   min_value=today + datetime.timedelta(days=1),
                                    max_value=today + datetime.timedelta(days=730),
                                    key="irp_expiry")
         irp_days   = (irp_expiry - today).days
@@ -1656,7 +1614,7 @@ with tab3:
             return d + datetime.timedelta(days=days_ahead)
         fb_expiry  = st.date_input("Futures Expiry Date",
                                    value=_next_tuesday(today),
-                                   min_value=today if today.weekday() == 1 else today + datetime.timedelta(days=1),
+                                   min_value=today + datetime.timedelta(days=1),
                                    max_value=today + datetime.timedelta(days=365),
                                    key="fb_expiry")
         fb_days    = (fb_expiry - today).days
@@ -2027,7 +1985,7 @@ the dashboard calculates the arbitrage profit and provides step-by-step executio
 
 **Course:** Financial Engineering
 
-**Team:** Anchal Verma Group
+**Team:** Group 4
 
 **Supervisor:** Financial Engineering Faculty
 
