@@ -471,41 +471,46 @@ NSE_CHAIN_URLS = {
 # ── FEATURE 1: LIVE MARKET STATUS TICKER BAR ─────────────────────────────────
 @st.cache_data(ttl=120, show_spinner=False)
 def get_ticker_bar_data():
-    """Fetch all 5 asset spots + USD/INR — tries fast_info (live intraday) first,
-    falls back to history(period='5d') close if fast_info is unavailable."""
+    """Fetch all 5 asset spots + USD/INR.
+    Uses history(period=5d) for reliable prev close comparison."""
     results = {}
     for name, ticker in TICKER_MAP.items():
         try:
             t = yf.Ticker(ticker)
-            # fast_info gives live intraday last price during market hours
-            fi = t.fast_info
-            live_price = getattr(fi, "last_price", None) or getattr(fi, "regularMarketPrice", None)
-            if live_price and float(live_price) > 0:
-                price = float(live_price)
-                prev  = getattr(fi, "previous_close", None) or float(price)
-                prev  = float(prev) if prev else price
-            else:
-                # fallback: last two closes
-                h = t.history(period="5d")
-                if h.empty:
-                    raise ValueError("empty history")
+            # Get last 5 days history — most reliable source for prev close
+            h = t.history(period="5d")
+            if not h.empty:
                 price = float(h["Close"].iloc[-1])
                 prev  = float(h["Close"].iloc[-2]) if len(h) > 1 else price
-            results[name] = {"price": price, "chg": price - prev, "chg_pct": (price - prev) / prev * 100}
+                # Try fast_info for more current intraday price
+                try:
+                    fi = t.fast_info
+                    live = getattr(fi, "last_price", None)
+                    if live and float(live) > 0 and abs(float(live) - price) / price < 0.05:
+                        price = float(live)  # use live only if within 5% of last close
+                except Exception:
+                    pass
+                results[name] = {"price": price, "chg": price - prev, "chg_pct": (price - prev) / prev * 100}
+            else:
+                results[name] = {"price": FALLBACK_SPOTS[name], "chg": 0, "chg_pct": 0}
         except Exception:
             results[name] = {"price": FALLBACK_SPOTS[name], "chg": 0, "chg_pct": 0}
     try:
-        t = yf.Ticker("USDINR=X")
-        fi = t.fast_info
-        live_price = getattr(fi, "last_price", None) or getattr(fi, "regularMarketPrice", None)
-        if live_price and float(live_price) > 0:
-            price = float(live_price)
-            prev  = float(getattr(fi, "previous_close", None) or price)
-        else:
-            h = t.history(period="5d")
-            price = float(h["Close"].iloc[-1]) if not h.empty else 83.50
+        t  = yf.Ticker("USDINR=X")
+        h  = t.history(period="5d")
+        if not h.empty:
+            price = float(h["Close"].iloc[-1])
             prev  = float(h["Close"].iloc[-2]) if len(h) > 1 else price
-        results["USD/INR"] = {"price": price, "chg": price - prev, "chg_pct": (price - prev) / prev * 100}
+            try:
+                fi   = t.fast_info
+                live = getattr(fi, "last_price", None)
+                if live and float(live) > 0 and abs(float(live) - price) / price < 0.05:
+                    price = float(live)
+            except Exception:
+                pass
+            results["USD/INR"] = {"price": price, "chg": price - prev, "chg_pct": (price - prev) / prev * 100}
+        else:
+            results["USD/INR"] = {"price": 83.50, "chg": 0, "chg_pct": 0}
     except Exception:
         results["USD/INR"] = {"price": 83.50, "chg": 0, "chg_pct": 0}
     return results
@@ -533,7 +538,7 @@ for asset_name, d in ticker_data.items():
         '<span style="font-size:13px; font-weight:500; color:#a8b3c8;'
         ' margin-right:24px; display:inline-flex; align-items:center; gap:6px;'
         ' font-family:DM Sans,sans-serif;">'
-        '<span style="color:#525f7a; font-size:10.5px; font-weight:700;'
+        '<span style="color:#a8b3c8; font-size:10.5px; font-weight:700;'
         ' letter-spacing:0.06em; font-family:DM Mono,monospace;">{n}</span>'
         '<span style="color:#d0d9ea; font-family:DM Mono,monospace; font-weight:500;">{p}{v:,.2f}</span>'
         '<span style="color:{c}; font-size:11px; font-weight:600;">{a} {pct:.2f}%</span>'
