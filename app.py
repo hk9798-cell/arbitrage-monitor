@@ -1285,7 +1285,7 @@ with tab1:
 
 
     # ── FEATURE 12: ALERT SYSTEM ─────────────────────────────────────────────
-    alert_threshold = st.session_state.get("alert_threshold", 500)
+    alert_threshold = st.session_state.get("alert_threshold", 100)
     if signal_type != "none" and pnl_profitable and net_pnl >= alert_threshold:
         st.markdown(
             '<div style="background:rgba(0,200,150,0.07); border:1px solid rgba(0,200,150,0.3);'
@@ -1862,7 +1862,7 @@ with tab4:
 
         st.markdown("**🚨 Alert Threshold**")
         if "alert_threshold" not in st.session_state:
-            st.session_state["alert_threshold"] = 500.0
+            st.session_state["alert_threshold"] = 100.0
         new_alert_thr = st.number_input("Minimum Net P&L to trigger TRADE NOW banner (₹)",
                                         value=float(st.session_state["alert_threshold"]),
                                         min_value=0.0, step=100.0,
