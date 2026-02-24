@@ -437,7 +437,7 @@ st.markdown("""
         letter-spacing: 0.04em;
         font-family: DM Sans, system-ui, sans-serif;
     ">IIT Roorkee &nbsp;·&nbsp; Dept. of Management Studies &nbsp;·&nbsp; Financial Engineering &nbsp;·&nbsp;
-    <span style="color:#7a6230; font-weight: 600;">Group 5</span></div>
+    <span style="color:#7a6230; font-weight: 600;">Group 4</span></div>
   </div>
   <div style="
       padding: 5px 12px;
@@ -720,23 +720,14 @@ with tab0:
     # ── run scan ──────────────────────────────────────────────────────────────
     today_sc = datetime.date.today()
 
-    def last_thursday_sc(year, month):
-        import calendar
-        cal = calendar.monthcalendar(year, month)
-        thursdays = [w[3] for w in cal if w[3] != 0]
-        return datetime.date(year, month, thursdays[-1])
+    def next_tuesday_expiry(from_date):
+        """Next weekly Tuesday expiry (NSE weekly options expire on Tuesday)"""
+        days_ahead = 1 - from_date.weekday()  # Tuesday = weekday 1
+        if days_ahead <= 0:
+            days_ahead += 7
+        return from_date + datetime.timedelta(days=days_ahead)
 
-    def next_expiry_sc():
-        y, m = today_sc.year, today_sc.month
-        for _ in range(3):
-            exp = last_thursday_sc(y, m)
-            if exp > today_sc:
-                return exp
-            m += 1
-            if m > 12: m = 1; y += 1
-        return today_sc + datetime.timedelta(days=30)
-
-    scan_expiry = next_expiry_sc()
+    scan_expiry = next_tuesday_expiry(today_sc)
     scan_T      = max((scan_expiry - today_sc).days, 1) / 365.0
     scan_r      = st.session_state.r_rate_pct / 100
     scan_brok   = st.session_state.brokerage_flat
@@ -1106,23 +1097,22 @@ with tab1:
     exp_col1, exp_col2, exp_col3 = st.columns([1.2, 1.2, 1.6])
     with exp_col1:
         today = datetime.date.today()
-        # Next NSE monthly expiry = last Thursday of the month
-        def last_thursday(year, month):
-            import calendar
-            cal = calendar.monthcalendar(year, month)
-            thursdays = [w[3] for w in cal if w[3] != 0]
-            return datetime.date(year, month, thursdays[-1])
+        # NSE weekly expiries — every Tuesday
+        def next_weekly_tuesdays(from_date, count=6):
+            """Return next N weekly Tuesday expiry dates"""
+            tuesdays = []
+            d = from_date
+            while len(tuesdays) < count:
+                days_ahead = 1 - d.weekday()  # Tuesday = 1
+                if days_ahead <= 0:
+                    days_ahead += 7
+                d = d + datetime.timedelta(days=days_ahead)
+                tuesdays.append(d)
+                d = d + datetime.timedelta(days=1)
+            return tuesdays
 
-        # Build next 4 monthly expiries
-        suggested_expiries = []
-        y, m = today.year, today.month
-        for _ in range(4):
-            exp = last_thursday(y, m)
-            if exp > today:
-                suggested_expiries.append(exp)
-            m += 1
-            if m > 12:
-                m = 1; y += 1
+        # Build next 6 weekly Tuesday expiries
+        suggested_expiries = next_weekly_tuesdays(today, count=6)
 
         # If NSE API returned expiry string, parse it
         parsed_nse_expiry = None
@@ -1153,7 +1143,7 @@ with tab1:
         if parsed_nse_expiry:
             st.success("✅ NSE expiry loaded: **{}**".format(nse_expiry))
         else:
-            st.info("📅 Manually selected expiry. NSE monthly expiries are typically the last Thursday of each month.")
+            st.info("📅 Manually selected expiry. NSE weekly expiries fall every Tuesday. Next 6 Tuesdays are pre-filled.")
 
     t = days_to_expiry / 365.0
 
@@ -1224,29 +1214,35 @@ with tab1:
     fno_orders      = 2 * num_lots
     total_brokerage = brokerage * (fno_orders + 2)
     stt_spot        = s0 * total_units * 0.001
-    stt_options     = (c_mkt + p_mkt) * total_units * 0.000625
-    total_friction  = total_brokerage + stt_spot + stt_options
     gross_spread    = abs(spread_per_unit) * total_units
     arb_threshold   = s0 * (arb_threshold_pct / 100)
 
     if spread_per_unit > arb_threshold:
         signal_line, signal_color, strategy_desc, signal_type = \
             "✅ CONVERSION ARBITRAGE DETECTED", "#00c896", "Buy Spot  ·  Buy Put  ·  Sell Call", "conversion"
-        net_pnl = gross_spread - total_friction
+        # Conversion: Sell Call → STT on Call premium only
+        stt_options    = c_mkt * total_units * 0.000625
+        total_friction = total_brokerage + stt_spot + stt_options
+        net_pnl        = gross_spread - total_friction
     elif spread_per_unit < -arb_threshold:
         signal_line, signal_color, strategy_desc, signal_type = \
             "🔴 REVERSAL ARBITRAGE DETECTED", "#ff4d6a", "Short Spot  ·  Sell Put  ·  Buy Call", "reversal"
-        net_pnl = gross_spread - total_friction
+        # Reversal: Sell Put → STT on Put premium only
+        stt_options    = p_mkt * total_units * 0.000625
+        total_friction = total_brokerage + stt_spot + stt_options
+        net_pnl        = gross_spread - total_friction
     else:
         signal_line, signal_color, strategy_desc, signal_type = \
             "⚪ MARKET IS EFFICIENT — No Arbitrage", "#525f7a", "No Action", "none"
-        net_pnl = -total_friction
+        stt_options    = 0.0
+        total_friction = total_brokerage + stt_spot
+        net_pnl        = -total_friction
 
     pnl_profitable = net_pnl > 0
 
     # ── METRICS ROW ───────────────────────────────────────────────────────────
     st.markdown("---")
-    ann_return_pcp = (net_pnl / max(s0 * total_units * margin_pct, 1)) * (365 / max(days_to_expiry, 1)) * 100
+    ann_return_pcp = (net_pnl / max(s0 * total_units, 1)) * (365 / max(days_to_expiry, 1)) * 100
 
     m1, m2, m3, m4, m5, m6 = st.columns(6)
     m1.metric("Market Spot",       "₹{:,.2f}".format(s0))
@@ -1985,7 +1981,7 @@ the dashboard calculates the arbitrage profit and provides step-by-step executio
 
 **Course:** Financial Engineering
 
-**Team:** Group 5
+**Team:** Group 4
 
 **Supervisor:** Financial Engineering Faculty
 
