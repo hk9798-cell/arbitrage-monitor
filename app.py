@@ -626,10 +626,14 @@ def get_market_data(asset_name):
 
 @st.cache_data(ttl=300, show_spinner=False)
 def get_forex_rate():
-    """Fetch USD/INR spot rate via yfinance."""
+    """Fetch USD/INR spot rate — tries fast_info first for live price."""
     try:
-        t = yf.Ticker("USDINR=X")
-        h = t.history(period="2d")
+        t  = yf.Ticker("USDINR=X")
+        fi = t.fast_info
+        live = getattr(fi, "last_price", None) or getattr(fi, "regularMarketPrice", None)
+        if live and float(live) > 0:
+            return float(round(live, 4))
+        h = t.history(period="5d")
         if not h.empty:
             return float(round(h["Close"].iloc[-1], 4))
     except Exception:
@@ -1202,23 +1206,27 @@ with tab1:
         strike = st.number_input("Strike Price (₹)", value=default_strike, step=step, format="%.2f", key="pcp_strike_{}".format(asset))
     with p2:
         live_call    = lookup_option_price(calls_df, strike)
-        # Black-Scholes based ATM option price defaults — changes with expiry & spot
+        # Black-Scholes based option price defaults — updates with strike, expiry & spot
         def bs_atm_price(S, K, T_days, sigma):
-            """Calculate ATM Call & Put using Black-Scholes"""
+            """Calculate Call & Put using Black-Scholes.
+            At T=0 (expiry day): returns intrinsic value only."""
             import math
-            T = max(T_days, 0.5) / 365.0
             r_bs = 0.0675
+            # T=0: only intrinsic value remains
+            if T_days <= 0:
+                call = max(S - K, 0.01)
+                put  = max(K - S, 0.01)
+                return round(call, 2), round(put, 2)
+            T = T_days / 365.0
             try:
                 d1 = (math.log(S/K) + (r_bs + 0.5*sigma**2)*T) / (sigma*math.sqrt(T))
                 d2 = d1 - sigma*math.sqrt(T)
-                # Cumulative normal distribution approximation
-                def N(x):
-                    return 0.5*(1+math.erf(x/math.sqrt(2)))
+                def N(x): return 0.5*(1+math.erf(x/math.sqrt(2)))
                 call = S*N(d1) - K*math.exp(-r_bs*T)*N(d2)
                 put  = K*math.exp(-r_bs*T)*N(-d2) - S*N(-d1)
                 return round(max(call,0.01),2), round(max(put,0.01),2)
             except Exception:
-                return round(S*0.006,2), round(S*0.005,2)
+                return round(max(S-K,0.01),2), round(max(K-S,0.01),2)
 
         ASSET_IV = {"NIFTY": 0.13, "RELIANCE": 0.22, "TCS": 0.20,
                     "SBIN": 0.28, "INFY": 0.24}
@@ -1271,6 +1279,10 @@ with tab1:
     pnl_profitable = net_pnl > 0
 
     # ── METRICS ROW ───────────────────────────────────────────────────────────
+    # Warn user if today is expiry day
+    if days_to_expiry <= 0:
+        st.warning("⚠️ **Today is expiry day (T=0).** Option prices shown are intrinsic values only — no time premium remains. For meaningful arbitrage analysis, please select **next Tuesday's expiry** from the date picker above.")
+
     st.markdown("---")
     ann_return_pcp = (net_pnl / max(s0 * total_units, 1)) * (365 / max(days_to_expiry, 1)) * 100
 
